@@ -1,0 +1,5 @@
+Notes from George:
+
+1) The following project structure was recommended by Gemini) So I guess it's quite good and we can stick to it.
+2) I also decided to refuse from sending jwt token in the response. Instead we will send set-cookie task. Gemini told that this method is superior and safer for web applications.
+3) There is an example of how to use it (previous point) in my partner folder
