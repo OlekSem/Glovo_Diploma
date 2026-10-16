@@ -1,0 +1,6 @@
+@GlovoBackEnd_HostAddress = http://localhost:5285
+
+GET {{GlovoBackEnd_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
