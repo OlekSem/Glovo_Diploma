@@ -81,15 +81,32 @@ builder.Services.AddAuthentication(options =>
                 Encoding.UTF8.GetBytes(
                     builder.Configuration["Jwt:Key"]
                     ?? throw new InvalidOperationException(
-                        "JWT signing key is not configured.")))
+                        "JWT signing key is not configured."))),
+
+            RoleClaimType = "roles",
+            NameClaimType = "username"
         };
 
-        // Read the JWT from the authentication cookie.
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
             {
-                context.Token = context.Request.Cookies["access_token"];
+                // Токен із заголовка Authorization (Swagger, Postman) має пріоритет
+                if (!string.IsNullOrEmpty(context.Token))
+                    return Task.CompletedTask;
+
+                var path = context.Request.Path;
+                var cookies = context.Request.Cookies;
+
+                if (path.StartsWithSegments("/api/partner"))
+                    context.Token = cookies["partner_access_token"];
+                else if (path.StartsWithSegments("/api/client"))
+                    context.Token = cookies["client_access_token"];
+                else
+                    // Спільні ендпоінти: беремо той cookie, який є
+                    context.Token = cookies["client_access_token"]
+                                    ?? cookies["partner_access_token"];
+
                 return Task.CompletedTask;
             }
         };
