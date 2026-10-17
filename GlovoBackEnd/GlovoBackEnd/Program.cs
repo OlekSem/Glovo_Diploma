@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using GlovoBackEnd.Data;
 using GlovoBackEnd.Domain.Entities.Identity;
@@ -11,12 +12,12 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Database Configuration (EF Core + PostgreSQL)
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Controllers and Swagger
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -29,7 +30,7 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Glovo Backend API Documentation"
     });
 
-    // Configure JWT authentication in Swagger
+    
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.Http,
@@ -38,9 +39,12 @@ builder.Services.AddSwaggerGen(options =>
         In = ParameterLocation.Header,
         Description = "Enter your JWT token."
     });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
 });
 
-// 3. ASP.NET Core Identity (MUST be called before configuring JWT schemes)
 builder.Services.AddIdentity<UserEntity, RoleEntity>(options =>
     {
         options.Password.RequireDigit = false;
@@ -53,17 +57,12 @@ builder.Services.AddIdentity<UserEntity, RoleEntity>(options =>
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// 4. Consolidated Authentication Setup (Forces JWT Bearer over Identity Cookies)
 builder.Services.AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme =
-            JwtBearerDefaults.AuthenticationScheme;
-
-        options.DefaultChallengeScheme =
-            JwtBearerDefaults.AuthenticationScheme;
-
-        options.DefaultScheme =
-            JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
     {
@@ -83,7 +82,7 @@ builder.Services.AddAuthentication(options =>
                     ?? throw new InvalidOperationException(
                         "JWT signing key is not configured."))),
 
-            RoleClaimType = "roles",
+            RoleClaimType = ClaimTypes.Role,
             NameClaimType = "username"
         };
 
@@ -91,8 +90,9 @@ builder.Services.AddAuthentication(options =>
         {
             OnMessageReceived = context =>
             {
-                // Токен із заголовка Authorization (Swagger, Postman) має пріоритет
-                if (!string.IsNullOrEmpty(context.Token))
+                // FIX 3: на цей момент context.Token завжди порожній,
+                // тому перевіряємо заголовок напряму
+                if (context.Request.Headers.ContainsKey("Authorization"))
                     return Task.CompletedTask;
 
                 var path = context.Request.Path;
@@ -102,14 +102,39 @@ builder.Services.AddAuthentication(options =>
                     context.Token = cookies["partner_access_token"];
                 else if (path.StartsWithSegments("/api/client"))
                     context.Token = cookies["client_access_token"];
+                else if (path.StartsWithSegments("/api/courier"))
+                    context.Token = cookies["courier_access_token"];
                 else
-                    // Спільні ендпоінти: беремо той cookie, який є
                     context.Token = cookies["client_access_token"]
-                                    ?? cookies["partner_access_token"];
+                                    ?? cookies["partner_access_token"]
+                                    ?? cookies["courier_access_token"];
+
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    var existing = identity.FindAll(ClaimTypes.Role)
+                        .Select(c => c.Value)
+                        .ToHashSet();
+
+                    var extra = identity
+                        .FindAll(c => c.Type is "role" or "roles")
+                        .ToList();
+
+                    foreach (var claim in extra)
+                    {
+                        if (existing.Add(claim.Value))
+                            identity.AddClaim(new Claim(ClaimTypes.Role, claim.Value));
+                    }
+                }
 
                 return Task.CompletedTask;
             }
+            
         };
+        
     });
 
 
@@ -137,8 +162,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 6. Register Application Services
-// builder.Services.AddScoped<IOrderService, OrderService>();
+
 
 var app = builder.Build();
 
@@ -151,7 +175,7 @@ using (var scope = app.Services.CreateScope())
     dbContext.Database.Migrate();
 }
 
-// 8. Swagger UI
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -166,7 +190,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// 9. Middleware
+
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
