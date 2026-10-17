@@ -17,11 +17,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers\Courier\" />
       <Folder Include="Domain\Enums\" />
       <Folder Include="Hubs\" />
       <Folder Include="Middleware\" />
-      <Folder Include="Models\Dtos\Courier\" />
     </ItemGroup>
 
 </Project>
