@@ -7,6 +7,8 @@ public class UserEntity : IdentityUser<Guid>
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
     public string? Image { get; set; }
+    public string? RefreshToken { get; set; }  
+    public DateTime? RefreshTokenExpiry { get; set; }
     public DateTime DateCreated { get; set; } = DateTime.UtcNow;
     public ICollection<UserRoleEntity> UserRoles { get; set; } = new List<UserRoleEntity>();
 }

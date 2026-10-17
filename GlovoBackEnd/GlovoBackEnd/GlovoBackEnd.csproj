@@ -17,13 +17,10 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Controllers\Client\" />
       <Folder Include="Controllers\Courier\" />
       <Folder Include="Domain\Enums\" />
       <Folder Include="Hubs\" />
       <Folder Include="Middleware\" />
-      <Folder Include="Models\Dtos\Client\" />
-      <Folder Include="Models\Dtos\Common\" />
       <Folder Include="Models\Dtos\Courier\" />
     </ItemGroup>
 

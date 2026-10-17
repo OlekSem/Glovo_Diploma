@@ -1,18 +1,18 @@
 namespace GlovoBackEnd.Models.Dtos.Partner;
 
-public record RegisterPartnerDto(
+public sealed record RegisterPartnerDto(
     string Email,
     string Password,
     string FirstName,
     string LastName
 );
 
-public record LoginPartnerDto(
+public sealed record LoginPartnerDto(
     string Email,
     string Password
 );
 
-public record PartnerResponseDto(
+public sealed record PartnerResponseDto(
     Guid Id,
     string Email,
     string? FirstName,
@@ -21,6 +21,4 @@ public record PartnerResponseDto(
     DateTime DateCreated
 );
 
-public record AuthTokenResponseDto(
-    PartnerResponseDto Partner
-);
+public sealed record AuthTokenResponseDto(PartnerResponseDto Partner);
