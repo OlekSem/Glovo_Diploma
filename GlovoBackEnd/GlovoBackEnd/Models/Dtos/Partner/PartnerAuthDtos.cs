@@ -21,4 +21,4 @@ public sealed record PartnerResponseDto(
     DateTime DateCreated
 );
 
-public sealed record AuthTokenResponseDto(PartnerResponseDto Partner);
+public sealed record AuthPartnerResponseDto(PartnerResponseDto Partner);
