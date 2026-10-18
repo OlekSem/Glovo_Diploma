@@ -142,8 +142,10 @@ builder.Services.AddAuthentication(options =>
 
 
 builder.Services.AddAuthorization();
+// Jwt Token Service
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
-
+// Email Service
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 
 
