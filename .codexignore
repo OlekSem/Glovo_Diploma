@@ -1,0 +1,13 @@
+# Ignore development settings containing real keys
+appsettings.Development.json
+appsettings.*.local.json
+*.env
+
+# Ignore local user secret files or certificate exports
+*.pfx
+secrets/
+
+# Ignore build artifacts or sensitive dumps
+bin/
+obj/
+logs/
