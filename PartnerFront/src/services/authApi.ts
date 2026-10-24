@@ -1,11 +1,16 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import APP_ENV from "../../env/index";
 import type {
-    AuthTokenResponseDto,
+    AuthPartnerResponseDto,
+    ChangePasswordDto,
+    ConfirmEmailDto,
+    EmailDto,
     LoginPartnerDto,
     MessageResponse,
     PartnerUser,
-    RegisterPartnerDto
+    RegisterPartnerDto,
+    RegistrationResponse,
+    ResetPasswordDto,
 } from "../interfaces/auth.ts";
 
 
@@ -19,7 +24,7 @@ export const authApi = createApi({
     }),
     tagTypes: ["Auth", "User"],
     endpoints: (builder) => ({
-        register: builder.mutation<AuthTokenResponseDto, RegisterPartnerDto>({
+        register: builder.mutation<RegistrationResponse, RegisterPartnerDto>({
             query: (credentials) => ({
                 url: "/register",
                 method: "POST",
@@ -28,12 +33,33 @@ export const authApi = createApi({
             invalidatesTags: ["User"],
         }),
 
-        login: builder.mutation<AuthTokenResponseDto, LoginPartnerDto>({
+        confirmEmail: builder.mutation<MessageResponse, ConfirmEmailDto>({
+            query: (payload) => ({ url: "/confirm-email", method: "POST", body: payload }),
+        }),
+
+        resendConfirmationEmail: builder.mutation<RegistrationResponse, EmailDto>({
+            query: (payload) => ({ url: "/resend-confirmation-email", method: "POST", body: payload }),
+        }),
+
+        login: builder.mutation<AuthPartnerResponseDto, LoginPartnerDto>({
             query: (credentials) => ({
                 url: "/login",
                 method: "POST",
                 body: credentials,
             }),
+            invalidatesTags: ["User"],
+        }),
+
+        forgotPassword: builder.mutation<MessageResponse, EmailDto>({
+            query: (payload) => ({ url: "/forgot-password", method: "POST", body: payload }),
+        }),
+
+        resetPassword: builder.mutation<MessageResponse, ResetPasswordDto>({
+            query: (payload) => ({ url: "/reset-password", method: "POST", body: payload }),
+        }),
+
+        changePassword: builder.mutation<MessageResponse, ChangePasswordDto>({
+            query: (payload) => ({ url: "/change-password", method: "POST", body: payload }),
             invalidatesTags: ["User"],
         }),
 
@@ -61,7 +87,12 @@ export const authApi = createApi({
 
 export const {
     useRegisterMutation,
+    useConfirmEmailMutation,
+    useResendConfirmationEmailMutation,
     useLoginMutation,
+    useForgotPasswordMutation,
+    useResetPasswordMutation,
+    useChangePasswordMutation,
     useGetMeQuery,
     useLazyGetMeQuery,
     useRefreshMutation,
