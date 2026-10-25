@@ -21,6 +21,8 @@
       dockerfile: Dockerfile
       platforms:
         - linux/amd64
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     image: semeniukoleksandr/glovo-app:partner-frontend-latest
     container_name: glovo_partner_frontend_app
     restart: always
