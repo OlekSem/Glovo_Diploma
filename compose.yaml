@@ -1,0 +1,35 @@
+﻿services:
+  api:
+    image: semeniukoleksandr/glovo-app:backend-latest
+    build:
+      context: ./GlovoBackEnd
+      dockerfile: GlovoBackEnd/Dockerfile
+      platforms:
+        - linux/amd64
+    container_name: glovo_backend_api
+    restart: always
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    networks:
+      - glovo-network
+
+  frontend:
+    build:
+      context: ./PartnerFront
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+    image: semeniukoleksandr/glovo-app:partner-frontend-latest
+    container_name: glovo_partner_frontend_app
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - glovo-network
+networks:
+  glovo-network:
+    driver: bridge
