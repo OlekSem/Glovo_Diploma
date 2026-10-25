@@ -12,26 +12,35 @@
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASS}
+      - Jwt__Key=${JWT_KEY}
+      - EmailSettings__Password=${EMAIL_PASSWORD}
+      - CORS__AllowedOrigins=${CORS_ORIGINS}
+    env_file:
+      - .env
     networks:
       - glovo-network
 
   frontend:
+    image: semeniukoleksandr/glovo-app:partner-frontend-latest
     build:
       context: ./PartnerFront
       dockerfile: Dockerfile
       platforms:
         - linux/amd64
       args:
-        - VITE_API_BASE_URL=http://16.192.175.236:5000
-    image: semeniukoleksandr/glovo-app:partner-frontend-latest
+        - VITE_API_URL=${VITE_API_URL:-http://16.192.175.236:5000}
     container_name: glovo_partner_frontend_app
     restart: always
     ports:
-      - "80:80"
+      - "8081:80" # Allows local access on port 8081 while using port 80 inside the container
     depends_on:
       - api
+    env_file:
+      - .env
     networks:
       - glovo-network
+
 networks:
   glovo-network:
     driver: bridge
