@@ -22,7 +22,7 @@ jobs:
 
       - name: Build and Push Images using Docker Compose
         env:
-          VITE_API_BASE_URL: http://16.192.175.236:5000
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: |
           docker compose build --no-cache
           docker compose push
