@@ -151,7 +151,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 
 
-var allowedOrigins = builder.Configuration["CORS_ORIGINS"] ?? "http://localhost:5173,http://localhost:3000";
+var allowedOrigins = builder.Configuration["CORS:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:8081,http://16.192.175.236,https://16.192.175.236";
 var originsList = allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 builder.Services.AddCors(options =>
