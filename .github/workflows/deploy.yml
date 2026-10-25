@@ -36,5 +36,6 @@ jobs:
           script: |
             cd /home/ubuntu/glovo
             docker compose pull
-            docker compose up -d --remove-orphans
+            compose up -d --force-recreate --remove-orphans 
+            docker image prune -f 
             echo "Docker Compose deployment completed successfully!"
