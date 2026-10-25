@@ -6,7 +6,6 @@ build/
 # JetBrains Rider / IDE
 .idea/
 *.sln.docstates
-appsettings.json
 
 # VS Code
 .vscode/
@@ -15,7 +14,6 @@ appsettings.json
 .wakatime-project
 
 # Ignore your real configuration files so keys never leak
-appsettings.json
 appsettings.Development.json
 appsettings.*.json
 !appsettings.example.json
