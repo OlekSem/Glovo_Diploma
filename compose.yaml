@@ -12,12 +12,6 @@
       - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASS}
-      - Jwt__Key=${JWT_KEY}
-      - EmailSettings__Password=${EMAIL_PASSWORD}
-      - CORS__AllowedOrigins=${CORS_ORIGINS}
-    env_file:
-      - .env
     networks:
       - glovo-network
 
@@ -36,8 +30,6 @@
       - "8081:80" # Allows local access on port 8081 while using port 80 inside the container
     depends_on:
       - api
-    env_file:
-      - .env
     networks:
       - glovo-network
 
