@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 
 public record ConfirmEmailDto(
     [Required, RegularExpression(@"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")] string UserId,
-    [Required, MinLength(1)] string Token);
+    [Required, MinLength(6)] string Code);
 
 public record ForgotPasswordDto([Required, EmailAddress, StringLength(254)] string Email);
 

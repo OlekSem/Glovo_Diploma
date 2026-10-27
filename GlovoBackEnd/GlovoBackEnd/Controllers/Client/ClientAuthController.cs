@@ -62,12 +62,13 @@ public class ClientAuthController(
             return BadRequest(roleResult.Errors);
         }
         
-        var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
+        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
         
         // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
 
-        var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
+        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
         
         // send the email via service
         //todo change the subject and possibly add a beautiful html message
@@ -76,7 +77,7 @@ public class ClientAuthController(
             await emailService.SendEmailAsync(
                 user.Email,
                 "Confirm Your Glovo Client Account",
-                $"Please confirm your account by clicking <a href='{confirmationLink}'>here</a>.");
+                $"Please confirm your account by this code: {code}.");
         }
         catch (Exception ex)
         {
@@ -115,11 +116,12 @@ public class ClientAuthController(
 
         try
         {
-            var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            var result = await userManager.ConfirmEmailAsync(user, decodedToken);
-            if (!result.Succeeded)
+            //var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
+            //var result = await userManager.ConfirmEmailAsync(user, decodedToken);
+            var res = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, dto.Code);
+            if (!res)
             {
-                return BadRequest(new { message = "Invalid or expired confirmation token.", errors = result.Errors });
+                return BadRequest(new { message = "Invalid or expired confirmation token." });
             }
 
             return Ok(new { message = "Thank you for confirming your email. You can now log in." });
@@ -140,19 +142,22 @@ public class ClientAuthController(
             return Ok(new { message = "If your account exists and is unconfirmed, a new confirmation token has been sent." });
         }
         
-        var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
+        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
         
-        var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
+        // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
+
+        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
         
-        // resend the email via service
+        // send the email via service
         //todo change the subject and possibly add a beautiful html message
         try
         {
             await emailService.SendEmailAsync(
                 user.Email,
-                "Resend: Confirm Your Glovo Client Account",
-                $"Please confirm your account by clicking <a href='{confirmationLink}'>here</a>.");
+                "Confirm Your Glovo Client Account",
+                $"Please confirm your account by this code: {code}.");
         }
         catch (Exception ex)
         {
