@@ -11,6 +11,8 @@ import {
     ResetPasswordPage,
 } from "./pages/AuthPages.tsx";
 import PartnerDashboard from "./pages/PartnerDashboard.tsx";
+import PartnerProfilePage from "./pages/PartnerProfilePage.tsx";
+import CreateCompanyPage from "./pages/CreateCompanyPage.tsx";
 
 function App() {
 
@@ -27,6 +29,8 @@ function App() {
           <Route path="/resend-confirmation" element={<ResendConfirmationPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route path="/dashboard" element={<PartnerDashboard />} />
+          <Route path="/profile" element={<PartnerProfilePage />} />
+          <Route path="/companies/new" element={<CreateCompanyPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
   )

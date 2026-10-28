@@ -22,6 +22,44 @@ namespace GlovoBackEnd.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("Companies", (string)null);
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.RoleEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -157,6 +195,137 @@ namespace GlovoBackEnd.Migrations
                     b.ToTable("AspNetUserRoles", (string)null);
                 });
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Partner.PartnerEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmationCodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmationCodeHash")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("RefreshToken")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("RefreshTokenExpiry")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique();
+
+                    b.HasIndex("Phone")
+                        .IsUnique();
+
+                    b.ToTable("Partners", (string)null);
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Partner.PartnerRoleEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("PartnerRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "CompanyOwner"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "AffiliateManager"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "AffiliateEmployee"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "User"
+                        });
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Partner.PartnerUserRoleEntity", b =>
+                {
+                    b.Property<Guid>("PartnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("PartnerId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("PartnerUserRoles", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
                     b.Property<int>("Id")
@@ -245,6 +414,17 @@ namespace GlovoBackEnd.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Partner.PartnerEntity", "Owner")
+                        .WithMany("Companies")
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Owner");
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.UserRoleEntity", b =>
                 {
                     b.HasOne("GlovoBackEnd.Domain.Entities.Identity.RoleEntity", null)
@@ -270,6 +450,25 @@ namespace GlovoBackEnd.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Partner.PartnerUserRoleEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Partner.PartnerEntity", "Partner")
+                        .WithMany("PartnerRoles")
+                        .HasForeignKey("PartnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Partner.PartnerRoleEntity", "Role")
+                        .WithMany("PartnerUsers")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Partner");
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -316,6 +515,18 @@ namespace GlovoBackEnd.Migrations
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.UserEntity", b =>
                 {
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Partner.PartnerEntity", b =>
+                {
+                    b.Navigation("Companies");
+
+                    b.Navigation("PartnerRoles");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Partner.PartnerRoleEntity", b =>
+                {
+                    b.Navigation("PartnerUsers");
                 });
 #pragma warning restore 612, 618
         }

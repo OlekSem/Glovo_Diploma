@@ -11,6 +11,7 @@ import type {
     RegisterPartnerDto,
     RegistrationResponse,
     ResetPasswordDto,
+    UpdatePartnerProfileDto,
 } from "../interfaces/auth.ts";
 
 
@@ -68,6 +69,11 @@ export const authApi = createApi({
             providesTags: ["User"],
         }),
 
+        updateProfile: builder.mutation<{ message: string; partner: PartnerUser }, UpdatePartnerProfileDto>({
+            query: (payload) => ({ url: "/profile", method: "PUT", body: payload }),
+            invalidatesTags: ["User"],
+        }),
+
         refresh: builder.mutation<MessageResponse, void>({
             query: () => ({
                 url: "/refresh",
@@ -94,6 +100,7 @@ export const {
     useResetPasswordMutation,
     useChangePasswordMutation,
     useGetMeQuery,
+    useUpdateProfileMutation,
     useLazyGetMeQuery,
     useRefreshMutation,
     useLogoutMutation,

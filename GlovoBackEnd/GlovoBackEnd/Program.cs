@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using GlovoBackEnd.Data;
 using GlovoBackEnd.Domain.Entities.Identity;
+using GlovoBackEnd.Domain.Entities.Partner;
 using GlovoBackEnd.Services.Implementations;
 using GlovoBackEnd.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -144,6 +145,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 // Jwt Token Service
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IPasswordHasher<PartnerEntity>, PasswordHasher<PartnerEntity>>();
 // Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
 
@@ -151,7 +153,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 
 
-var allowedOrigins = builder.Configuration["CORS:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:8081,http://16.192.175.236,https://16.192.175.236";
+var allowedOrigins = builder.Configuration["CORS:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:5174,http://localhost:8081,http://16.192.175.236,https://16.192.175.236";
 var originsList = allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 builder.Services.AddCors(options =>
