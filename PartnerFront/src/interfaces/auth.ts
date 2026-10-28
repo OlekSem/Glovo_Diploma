@@ -2,8 +2,9 @@ export interface PartnerUser {
     id: string;
     email: string;
     firstName: string;
-    lastName: string | null;
-    image: string | null;
+    lastName: string;
+    phone: string;
+    roles: string[];
     dateCreated: string;
 }
 
@@ -12,6 +13,7 @@ export interface RegisterPartnerDto {
     password: string;
     firstName: string;
     lastName: string;
+    phone: string;
 }
 
 export interface LoginPartnerDto {
@@ -28,13 +30,12 @@ export interface MessageResponse {
 }
 
 export interface RegistrationResponse extends MessageResponse {
-    devUserId?: string;
-    devToken?: string;
+    userId?: string;
 }
 
 export interface ConfirmEmailDto {
     userId: string;
-    token: string;
+    code: string;
 }
 
 export interface EmailDto {
@@ -50,4 +51,10 @@ export interface ResetPasswordDto {
 export interface ChangePasswordDto {
     currentPassword: string;
     newPassword: string;
+}
+
+export interface UpdatePartnerProfileDto {
+    firstName: string;
+    lastName: string;
+    phone: string;
 }

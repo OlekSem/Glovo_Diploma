@@ -3,6 +3,8 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using GlovoBackEnd.Domain.Entities.Identity;
+using GlovoBackEnd.Domain.Entities.Partner;
+using GlovoBackEnd.Data;
 
 using GlovoBackEnd.Models.Dtos.Common;
 using GlovoBackEnd.Services.Interfaces;
@@ -12,7 +14,10 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace GlovoBackEnd.Services.Implementations;
 
-public class JwtTokenService(IConfiguration configuration, UserManager<UserEntity> userManager) : IJwtTokenService
+public class JwtTokenService(
+    IConfiguration configuration,
+    UserManager<UserEntity> userManager,
+    AppDbContext dbContext) : IJwtTokenService
 {
     public async Task<string> GenerateToken(UserEntity user)
     {
@@ -90,5 +95,82 @@ public class JwtTokenService(IConfiguration configuration, UserManager<UserEntit
         user.RefreshToken = null;
         user.RefreshTokenExpiry = null;
         await userManager.UpdateAsync(user);
+    }
+
+    public async Task<AuthTokensDto> CreatePartnerAuthResponse(PartnerEntity partner)
+    {
+        var accessToken = GeneratePartnerToken(partner);
+        var refreshToken = GenerateRefreshToken();
+
+        partner.RefreshToken = Hash(refreshToken);
+        partner.RefreshTokenExpiry = DateTime.UtcNow.AddDays(7);
+        await dbContext.SaveChangesAsync();
+
+        return new AuthTokensDto
+        {
+            AccessToken = accessToken,
+            RefreshToken = refreshToken
+        };
+    }
+
+    public async Task<AuthTokensDto> RefreshPartnerTokenAsync(string refreshToken)
+    {
+        var hash = Hash(refreshToken);
+        var partner = await dbContext.Partners
+            .Include(x => x.PartnerRoles)
+            .ThenInclude(x => x.Role)
+            .SingleOrDefaultAsync(x => !x.IsDeleted && x.RefreshToken == hash);
+
+        if (partner == null || partner.RefreshTokenExpiry < DateTime.UtcNow)
+            throw new UnauthorizedAccessException("Invalid or expired refresh token");
+
+        return await CreatePartnerAuthResponse(partner);
+    }
+
+    public async Task RevokePartnerRefreshTokenAsync(string refreshToken)
+    {
+        var hash = Hash(refreshToken);
+        var partner = await dbContext.Partners
+            .SingleOrDefaultAsync(x => !x.IsDeleted && x.RefreshToken == hash);
+        if (partner == null) return;
+
+        partner.RefreshToken = null;
+        partner.RefreshTokenExpiry = null;
+        await dbContext.SaveChangesAsync();
+    }
+
+    private string GeneratePartnerToken(PartnerEntity partner)
+    {
+        var key = configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException("Jwt:Key is not configured");
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, partner.Id.ToString()),
+            new("email", partner.Email),
+            new("username", partner.Email),
+            new("firstName", partner.FirstName),
+            new("lastName", partner.LastName),
+            new("accountType", "partner")
+        };
+
+        foreach (var role in partner.PartnerRoles.Select(x => x.Role.Name))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+            claims.Add(new Claim("roles", role));
+        }
+
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
+            SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: configuration["Jwt:Issuer"],
+            audience: configuration["Jwt:Audience"],
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }

@@ -1,31 +1,29 @@
-using System.Text;
-using Microsoft.AspNetCore.WebUtilities;
-
-namespace GlovoBackEnd.Controllers.Partner;
-
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-
-using GlovoBackEnd.Domain.Entities.Identity;
+using System.Security.Cryptography;
+using GlovoBackEnd.Data;
+using GlovoBackEnd.Domain.Entities.Partner;
 using GlovoBackEnd.Mappers;
-using GlovoBackEnd.Models.Dtos.Partner;
 using GlovoBackEnd.Models.Dtos.Common;
+using GlovoBackEnd.Models.Dtos.Partner;
 using GlovoBackEnd.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 
-
+namespace GlovoBackEnd.Controllers.Partner;
 
 [ApiController]
 [Route("api/partner/auth")]
 public class PartnerAuthController(
-    UserManager<UserEntity> userManager,
-    RoleManager<RoleEntity> roleManager,
+    AppDbContext dbContext,
+    IPasswordHasher<PartnerEntity> passwordHasher,
     IJwtTokenService jwtTokenService,
     IEmailService emailService,
     IConfiguration configuration) : ControllerBase
 {
-    private const string PartnerRole = "Partner";
     private const string AccessCookie = "partner_access_token";
     private const string RefreshCookie = "partner_refresh_token";
     private const string RefreshCookiePath = "/api/partner/auth";
@@ -34,189 +32,124 @@ public class PartnerAuthController(
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterPartnerDto dto)
     {
-        
-        if (await userManager.FindByEmailAsync(dto.Email) != null)
-            return BadRequest(new { message = "User with this email already exists." });
+        var normalizedEmail = NormalizeEmail(dto.Email);
+        var normalizedPhone = NormalizePhone(dto.Phone);
 
-        var user = new UserEntity
+        if (await dbContext.Partners.AnyAsync(x => !x.IsDeleted && x.NormalizedEmail == normalizedEmail))
+            return BadRequest(new { message = "A partner with this email already exists." });
+
+        if (await dbContext.Partners.AnyAsync(x => !x.IsDeleted && x.Phone == normalizedPhone))
+            return BadRequest(new { message = "A partner with this phone number already exists." });
+
+        var ownerRole = await dbContext.PartnerRoles
+            .SingleAsync(x => x.Name == PartnerRoleNames.CompanyOwner);
+        var partner = new PartnerEntity
         {
-            UserName = dto.Email,
-            Email = dto.Email,
-            FirstName = dto.FirstName,
-            LastName = dto.LastName,
+            Id = Guid.NewGuid(),
+            Email = dto.Email.Trim(),
+            NormalizedEmail = normalizedEmail,
+            Phone = normalizedPhone,
+            FirstName = dto.FirstName.Trim(),
+            LastName = dto.LastName.Trim(),
             DateCreated = DateTime.UtcNow,
             EmailConfirmed = false
         };
+        partner.PasswordHash = passwordHasher.HashPassword(partner, dto.Password);
 
-        var result = await userManager.CreateAsync(user, dto.Password);
-        if (!result.Succeeded)
-            return BadRequest(result.Errors);
+        var code = SetConfirmationCode(partner);
+        partner.PartnerRoles.Add(new PartnerUserRoleEntity { PartnerId = partner.Id, RoleId = ownerRole.Id });
+        dbContext.Partners.Add(partner);
+        await dbContext.SaveChangesAsync();
 
-        if (!await roleManager.RoleExistsAsync(PartnerRole))
-            await roleManager.CreateAsync(new RoleEntity { Name = PartnerRole });
-
-        var roleResult = await userManager.AddToRoleAsync(user, PartnerRole);
-        if (!roleResult.Succeeded)
-        {
-            await userManager.DeleteAsync(user); // Rollback if the role was not added to the user
-            return BadRequest(roleResult.Errors);
-        }
-        
-        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
-        
-        // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
-
-        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
-        
-        // send the email via service
-        //todo change the subject and possibly add a beautiful html message
-        try
-        {
-            await emailService.SendEmailAsync(
-                user.Email,
-                "Confirm Your Glovo Partner Account",
-                $"Please confirm your account by this code: {code}.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Email Error] Failed to send confirmation email: {ex.Message}");
-        }
-        
-        //todo rm this when deploying
-        // REMOVE THESE BEFORE DEPLOYING
-        Console.WriteLine($"\n==================================================");
-        Console.WriteLine($"[SWAGGER DEV] Confirmation Token for {user.Email}:");
-        Console.WriteLine($"UserId: {user.Id}");
-        Console.WriteLine($"Token: {code}");
-        Console.WriteLine($"==================================================\n");
+        await SendConfirmationCodeAsync(partner.Email, code);
 
         return Ok(new
         {
-            message = "Registration successful. Please check your email (or backend console) to confirm your account.",
-            devUserId = user.Id, // REMOVE THESE BEFORE DEPLOYING
-            devToken = code, // REMOVE THESE BEFORE DEPLOYING
+            message = "Registration successful. Enter the confirmation code sent to your email.",
+            userId = partner.Id
         });
     }
 
     [HttpPost("confirm-email")]
     public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
     {
-        var user = await userManager.FindByIdAsync(dto.UserId);
-        if (user == null)
-        {
+        if (!Guid.TryParse(dto.UserId, out var partnerId))
             return BadRequest(new { message = "Invalid email confirmation request." });
-        }
 
-        if (user.EmailConfirmed)
-        {
+        var partner = await dbContext.Partners.SingleOrDefaultAsync(x => !x.IsDeleted && x.Id == partnerId);
+        if (partner == null)
+            return BadRequest(new { message = "Invalid email confirmation request." });
+
+        if (partner.EmailConfirmed)
             return BadRequest(new { message = "Email is already confirmed. You can log in." });
-        }
 
-        try
-        {
-            //var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            //var result = await userManager.ConfirmEmailAsync(user, decodedToken);
-            var res = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, dto.Code);
-            if (!res)
-            {
-                return BadRequest(new { message = "Invalid or expired confirmation token." });
-            }
+        if (partner.ConfirmationCodeExpiresAt < DateTime.UtcNow ||
+            string.IsNullOrWhiteSpace(partner.ConfirmationCodeHash) ||
+            passwordHasher.VerifyHashedPassword(partner, partner.ConfirmationCodeHash, dto.Code) == PasswordVerificationResult.Failed)
+            return BadRequest(new { message = "Invalid or expired confirmation code." });
 
-            return Ok(new { message = "Thank you for confirming your email. You can now log in." });
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = "Invalid email confirmation request." });
-        }
+        partner.EmailConfirmed = true;
+        partner.ConfirmationCodeHash = null;
+        partner.ConfirmationCodeExpiresAt = null;
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = "Thank you for confirming your email. You can now log in." });
     }
 
     [HttpPost("resend-confirmation-email")]
     public async Task<IActionResult> ResendConfirmationEmail([FromBody] ResendConfirmationEmailDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null || user.EmailConfirmed)
-        {
-            // not revealing if the email exists
-            return Ok(new { message = "If your account exists and is unconfirmed, a new confirmation token has been sent." });
-        }
-        
-        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
-        
-        // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
+        var partner = await dbContext.Partners.SingleOrDefaultAsync(x =>
+            !x.IsDeleted && x.NormalizedEmail == NormalizeEmail(dto.Email));
 
-        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
-        
-        // send the email via service
-        //todo change the subject and possibly add a beautiful html message
-        try
-        {
-            await emailService.SendEmailAsync(
-                user.Email,
-                "Confirm Your Glovo Partner Account",
-                $"Please confirm your account by this code: {code}.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Email Error] Failed to resend confirmation email: {ex.Message}");
-        }
-        
-        //todo rm this when deploying
-        // REMOVE THESE BEFORE DEPLOYING
-        Console.WriteLine($"\n==================================================");
-        Console.WriteLine($"[SWAGGER DEV] Resent Confirmation Token for {user.Email}:");
-        Console.WriteLine($"UserId: {user.Id}");
-        Console.WriteLine($"Token: {code}");
-        Console.WriteLine($"==================================================\n");
+        if (partner == null || partner.EmailConfirmed)
+            return Ok(new { message = "If your account exists and is unconfirmed, a new confirmation code has been sent." });
+
+        var code = SetConfirmationCode(partner);
+        await dbContext.SaveChangesAsync();
+        await SendConfirmationCodeAsync(partner.Email, code);
 
         return Ok(new
         {
-            message = "If your account exists and is unconfirmed, a new confirmation token has been sent.",
-            devUserId = user.Id, // REMOVE THESE BEFORE DEPLOYING
-            devToken = code, // REMOVE THESE BEFORE DEPLOYING
+            message = "A new confirmation code has been sent.",
+            userId = partner.Id
         });
-}
+    }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginPartnerDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
+        var partner = await FindPartnerWithRolesAsync(dto.Email);
+        if (partner == null || passwordHasher.VerifyHashedPassword(partner, partner.PasswordHash, dto.Password) == PasswordVerificationResult.Failed)
             return Unauthorized(new { message = "Invalid email or password." });
 
-        if (!await userManager.IsEmailConfirmedAsync(user))
+        if (!partner.EmailConfirmed)
             return Unauthorized(new { message = "Please confirm your email address before logging in." });
-        
-        if (!await userManager.IsInRoleAsync(user, PartnerRole))
-            return Forbid();
 
-        var auth = await jwtTokenService.CreateAuthResponse(user);
+        var auth = await jwtTokenService.CreatePartnerAuthResponse(partner);
         SetAuthCookies(auth);
-
-        return Ok(new AuthPartnerResponseDto(user.ToPartnerResponseDto()));
+        return Ok(new AuthPartnerResponseDto(partner.ToPartnerResponseDto()));
     }
 
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null || !await userManager.IsEmailConfirmedAsync(user))
-        {
+        var partner = await dbContext.Partners.SingleOrDefaultAsync(x =>
+            !x.IsDeleted && x.NormalizedEmail == NormalizeEmail(dto.Email));
+
+        if (partner == null || !partner.EmailConfirmed)
             return Ok(new { message = "If your email is registered and confirmed, a password reset link has been sent." });
-        }
-        var code = await userManager.GeneratePasswordResetTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        
-        var resetLink = $"{_frontendUrl}/partner/reset-password?email={user.Email}&token={code}";
-        
+
+        var token = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        partner.PasswordResetTokenHash = passwordHasher.HashPassword(partner, token);
+        partner.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(30);
+        await dbContext.SaveChangesAsync();
+
+        var resetLink = $"{_frontendUrl}/reset-password?email={Uri.EscapeDataString(partner.Email)}&token={Uri.EscapeDataString(token)}";
         try
         {
-            //todo change the subject and possibly add a beautiful html message
             await emailService.SendEmailAsync(
-                user.Email,
+                partner.Email,
                 "Reset Your Password",
                 $"Reset your password by clicking <a href='{resetLink}'>here</a>.");
         }
@@ -225,73 +158,47 @@ public class PartnerAuthController(
             Console.WriteLine($"[Email Error] Failed to send password reset email: {ex.Message}");
         }
 
-        //todo rm this when deploying
-        // REMOVE THESE BEFORE DEPLOYING
-        Console.WriteLine($"\n==================================================");
-        Console.WriteLine($"[SWAGGER DEV] Reset Token for {user.Email}:");
-        Console.WriteLine($"Email: {user.Email}");
-        Console.WriteLine($"Token: {code}");
-        Console.WriteLine($"==================================================\n");
-
-        return Ok(new
-        {
-            message = "If your email is registered and confirmed, a password reset link has been sent.",
-            devEmail = user.Email, // REMOVE THESE BEFORE DEPLOYING
-            devToken = code // REMOVE THESE BEFORE DEPLOYING
-        });
+        return Ok(new { message = "If your email is registered and confirmed, a password reset link has been sent." });
     }
 
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null)
-            return BadRequest(new { message = "Invalid password reset request." });
-        try
-        {
-            var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            var result = await userManager.ResetPasswordAsync(user, decodedToken, dto.NewPassword);
+        var partner = await dbContext.Partners.SingleOrDefaultAsync(x =>
+            !x.IsDeleted && x.NormalizedEmail == NormalizeEmail(dto.Email));
 
-            if (!result.Succeeded)
-            {
-                return BadRequest(new { message = "Failed to reset password.", errors = result.Errors });
-            }
-            
-            // 🚀 GLOBAL LOGOUT: Clear refresh token so ALL active sessions on all devices are killed
-            user.RefreshToken = null;
-            user.RefreshTokenExpiry = null;
-            await userManager.UpdateAsync(user);
-            return Ok(new { message = "Password has been successfully reset. You can now log in." });
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = "Invalid token format." });
-        }
+        if (partner == null || partner.PasswordResetTokenExpiresAt < DateTime.UtcNow ||
+            string.IsNullOrWhiteSpace(partner.PasswordResetTokenHash) ||
+            passwordHasher.VerifyHashedPassword(partner, partner.PasswordResetTokenHash, dto.Token) == PasswordVerificationResult.Failed)
+            return BadRequest(new { message = "Invalid or expired password reset request." });
+
+        partner.PasswordHash = passwordHasher.HashPassword(partner, dto.NewPassword);
+        partner.PasswordResetTokenHash = null;
+        partner.PasswordResetTokenExpiresAt = null;
+        partner.RefreshToken = null;
+        partner.RefreshTokenExpiry = null;
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new { message = "Password has been successfully reset. You can now log in." });
     }
 
+    [Authorize(Roles = PartnerRoleNames.AnyPartnerRole)]
     [HttpPost("change-password")]
-    [Authorize(Roles = PartnerRole)]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
     {
-        var user = await GetCurrentUserAsync();
-        if (user == null)
-        {
-            return NotFound(new { message = "Partner user not found." });
-        }
-        var result = await userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
-        if (!result.Succeeded)
-        {
-            return BadRequest(new { message = "Failed to change password.", errors = result.Errors });
-        }
-        
-        // 1. Kill the refresh token in the database
-        user.RefreshToken = null;
-        user.RefreshTokenExpiry = null;
-        await userManager.UpdateAsync(user);
+        var partner = await GetCurrentPartnerAsync();
+        if (partner == null)
+            return NotFound(new { message = "Partner account not found." });
 
-        // 2. Delete the auth cookies from the browser immediately
+        if (passwordHasher.VerifyHashedPassword(partner, partner.PasswordHash, dto.CurrentPassword) == PasswordVerificationResult.Failed)
+            return BadRequest(new { message = "Current password is incorrect." });
+
+        partner.PasswordHash = passwordHasher.HashPassword(partner, dto.NewPassword);
+        partner.RefreshToken = null;
+        partner.RefreshTokenExpiry = null;
+        await dbContext.SaveChangesAsync();
         DeleteAuthCookies();
-        
+
         return Ok(new { message = "Password has been successfully changed. You have been logged out." });
     }
 
@@ -304,7 +211,7 @@ public class PartnerAuthController(
 
         try
         {
-            var auth = await jwtTokenService.RefreshTokenAsync(refreshToken);
+            var auth = await jwtTokenService.RefreshPartnerTokenAsync(refreshToken);
             SetAuthCookies(auth);
             return Ok(new { message = "Token refreshed." });
         }
@@ -315,15 +222,40 @@ public class PartnerAuthController(
         }
     }
 
-    [Authorize(Roles = PartnerRole)]
+    [Authorize(Roles = PartnerRoleNames.AnyPartnerRole)]
     [HttpGet("me")]
     public async Task<IActionResult> GetMe()
     {
-        var user = await GetCurrentUserAsync();
-        if (user == null)
-            return NotFound(new { message = "Partner user not found." });
+        var partner = await GetCurrentPartnerAsync();
+        return partner == null
+            ? NotFound(new { message = "Partner account not found." })
+            : Ok(partner.ToPartnerResponseDto());
+    }
 
-        return Ok(user.ToPartnerResponseDto());
+    [Authorize(Roles = PartnerRoleNames.AnyPartnerRole)]
+    [HttpPut("profile")]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdatePartnerProfileDto dto)
+    {
+        var partner = await GetCurrentPartnerAsync();
+        if (partner == null)
+            return NotFound(new { message = "Partner account not found." });
+
+        var phone = NormalizePhone(dto.Phone);
+        var phoneIsInUse = await dbContext.Partners.AnyAsync(x =>
+            !x.IsDeleted && x.Id != partner.Id && x.Phone == phone);
+        if (phoneIsInUse)
+            return BadRequest(new { message = "A partner with this phone number already exists." });
+
+        partner.FirstName = dto.FirstName.Trim();
+        partner.LastName = dto.LastName.Trim();
+        partner.Phone = phone;
+        await dbContext.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Partner profile updated successfully.",
+            partner = partner.ToPartnerResponseDto()
+        });
     }
 
     [HttpPost("logout")]
@@ -331,21 +263,56 @@ public class PartnerAuthController(
     {
         var refreshToken = Request.Cookies[RefreshCookie];
         if (!string.IsNullOrEmpty(refreshToken))
-            await jwtTokenService.RevokeRefreshTokenAsync(refreshToken);
+            await jwtTokenService.RevokePartnerRefreshTokenAsync(refreshToken);
 
         DeleteAuthCookies();
         return Ok(new { message = "Logged out successfully." });
     }
 
-    private async Task<UserEntity?> GetCurrentUserAsync()
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                     ?? User.FindFirstValue("sub");
+    private async Task<PartnerEntity?> FindPartnerWithRolesAsync(string email) =>
+        await dbContext.Partners
+            .Include(x => x.PartnerRoles)
+            .ThenInclude(x => x.Role)
+            .SingleOrDefaultAsync(x => !x.IsDeleted && x.NormalizedEmail == NormalizeEmail(email));
 
-        return Guid.TryParse(userId, out var id)
-            ? await userManager.FindByIdAsync(id.ToString())
+    private async Task<PartnerEntity?> GetCurrentPartnerAsync()
+    {
+        var partnerId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+
+        return Guid.TryParse(partnerId, out var id)
+            ? await dbContext.Partners
+                .Include(x => x.PartnerRoles)
+                .ThenInclude(x => x.Role)
+                .SingleOrDefaultAsync(x => !x.IsDeleted && x.Id == id)
             : null;
     }
+
+    private string SetConfirmationCode(PartnerEntity partner)
+    {
+        var code = RandomNumberGenerator.GetInt32(100000, 1_000_000).ToString();
+        partner.ConfirmationCodeHash = passwordHasher.HashPassword(partner, code);
+        partner.ConfirmationCodeExpiresAt = DateTime.UtcNow.AddMinutes(10);
+        return code;
+    }
+
+    private async Task SendConfirmationCodeAsync(string email, string code)
+    {
+        try
+        {
+            await emailService.SendEmailAsync(
+                email,
+                "Confirm Your Glovo Partner Account",
+                $"Please confirm your account with this code: <strong>{code}</strong>.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email Error] Failed to send confirmation email: {ex.Message}");
+        }
+    }
+
+    private static string NormalizeEmail(string email) => email.Trim().ToUpperInvariant();
+    private static string NormalizePhone(string phone) => phone.Trim().Replace(" ", string.Empty).Replace("-", string.Empty);
 
     private void SetAuthCookies(AuthTokensDto auth)
     {

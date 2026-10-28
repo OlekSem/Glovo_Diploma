@@ -3,12 +3,14 @@ import {authApi} from "../services/authApi.ts";
 import {type TypedUseSelectorHook, useDispatch, useSelector} from "react-redux";
 import authReducer from "../services/authSlice.ts"
 import {appApi} from "../services/appApi.ts";
+import {companyApi} from "../services/companyApi.ts";
 // import {appApi} from "../services/appApi.ts";
 // import {authorizedUserApi} from "../services/AuthorizedUser/AuthorizedUserService.ts";
 
 const rootReducer = combineReducers({
     [authApi.reducerPath]: authApi.reducer,
     [appApi.reducerPath]: appApi.reducer,
+    [companyApi.reducerPath]: companyApi.reducer,
     auth: authReducer
     // [authorizedUserApi.reducerPath]: authorizedUserApi.reducer,
 });
@@ -19,7 +21,8 @@ export const setupStore = () => {
         middleware: (getDefaultMiddleware) =>
             getDefaultMiddleware().concat(
                 authApi.middleware,
-                appApi.middleware
+                appApi.middleware,
+                companyApi.middleware
                 // authorizedUserApi.middleware
             ),
 
