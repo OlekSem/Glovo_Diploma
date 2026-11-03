@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using GlovoBackEnd.Data;
 using GlovoBackEnd.Domain.Entities.Identity;
 using GlovoBackEnd.Domain.Entities.Partner;
@@ -19,7 +20,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(options =>
+    options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(options =>
@@ -105,6 +107,8 @@ builder.Services.AddAuthentication(options =>
                     context.Token = cookies["client_access_token"];
                 else if (path.StartsWithSegments("/api/courier"))
                     context.Token = cookies["courier_access_token"];
+                else if (path.StartsWithSegments("/api/admin"))
+                    context.Token = cookies["admin_access_token"];
                 else
                     context.Token = cookies["client_access_token"]
                                     ?? cookies["partner_access_token"]
@@ -153,7 +157,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 
 
-var allowedOrigins = builder.Configuration["CORS:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:5174,http://localhost:8081,http://16.192.175.236,https://16.192.175.236";
+var allowedOrigins = builder.Configuration["CORS:AllowedOrigins"] ?? "http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:8081,http://localhost:8082,http://16.192.175.236,http://16.192.175.236:8082,https://16.192.175.236";
 var originsList = allowedOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 builder.Services.AddCors(options =>
@@ -178,6 +182,7 @@ using (var scope = app.Services.CreateScope())
         .GetRequiredService<AppDbContext>();
 
     dbContext.Database.Migrate();
+    await AdminSeeder.SeedAsync(scope.ServiceProvider, builder.Configuration);
 }
 
 

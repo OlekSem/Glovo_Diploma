@@ -4,6 +4,9 @@ export interface Company {
     description: string;
     ownerId: string;
     dateCreated: string;
+    status: "Pending" | "Approved" | "Canceled";
+    moderationComment?: string | null;
+    reviewedAt?: string | null;
 }
 
 export interface CreateCompanyDto {
