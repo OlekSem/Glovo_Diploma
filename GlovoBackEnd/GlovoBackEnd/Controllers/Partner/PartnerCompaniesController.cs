@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GlovoBackEnd.Data;
 using GlovoBackEnd.Domain.Entities.Company;
+using GlovoBackEnd.Domain.Enums;
 using GlovoBackEnd.Domain.Entities.Partner;
 using GlovoBackEnd.Models.Dtos.Company;
 using Microsoft.AspNetCore.Authorization;
@@ -38,6 +39,7 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
             Name = dto.Name.Trim(),
             NormalizedName = normalizedName,
             Description = dto.Description.Trim(),
+            Status = CompanyStatus.Pending,
             DateCreated = DateTime.UtcNow
         };
         dbContext.Companies.Add(company);
@@ -53,9 +55,24 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
             return Unauthorized(new { message = "Invalid partner session." });
 
         var companies = await dbContext.Companies
-            .Where(x => !x.IsDeleted && x.OwnerId == partnerId)
+            .Where(x => !x.IsDeleted && x.OwnerId == partnerId && x.Status == CompanyStatus.Approved)
             .OrderBy(x => x.Name)
-            .Select(x => new CompanyResponseDto(x.Id, x.Name, x.Description, x.OwnerId, x.DateCreated))
+            .Select(x => new CompanyResponseDto(x.Id, x.Name, x.Description, x.OwnerId, x.DateCreated, x.Status, x.ModerationComment, x.ReviewedAt))
+            .ToListAsync();
+        return Ok(companies);
+    }
+
+    /// <summary>Returns the partner's submissions, including those still being moderated.</summary>
+    [HttpGet("mine/requests")]
+    public async Task<ActionResult<IReadOnlyCollection<CompanyResponseDto>>> GetMyRequests()
+    {
+        if (!TryGetPartnerId(out var partnerId))
+            return Unauthorized(new { message = "Invalid partner session." });
+
+        var companies = await dbContext.Companies
+            .Where(x => !x.IsDeleted && x.OwnerId == partnerId)
+            .OrderByDescending(x => x.DateCreated)
+            .Select(x => new CompanyResponseDto(x.Id, x.Name, x.Description, x.OwnerId, x.DateCreated, x.Status, x.ModerationComment, x.ReviewedAt))
             .ToListAsync();
         return Ok(companies);
     }
@@ -70,5 +87,5 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
     private static string NormalizeName(string name) => name.Trim().ToUpperInvariant();
 
     private static CompanyResponseDto ToResponse(CompanyEntity company) =>
-        new(company.Id, company.Name, company.Description, company.OwnerId, company.DateCreated);
+        new(company.Id, company.Name, company.Description, company.OwnerId, company.DateCreated, company.Status, company.ModerationComment, company.ReviewedAt);
 }

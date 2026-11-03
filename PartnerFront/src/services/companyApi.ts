@@ -18,7 +18,11 @@ export const companyApi = createApi({
             query: () => "/mine",
             providesTags: ["Companies"],
         }),
+        getMyCompanyRequests: builder.query<Company[], void>({
+            query: () => "/mine/requests",
+            providesTags: ["Companies"],
+        }),
     }),
 });
 
-export const { useCreateCompanyMutation, useGetMyCompaniesQuery } = companyApi;
+export const { useCreateCompanyMutation, useGetMyCompaniesQuery, useGetMyCompanyRequestsQuery } = companyApi;

@@ -2,6 +2,7 @@ using GlovoBackEnd.Domain.Entities;
 using GlovoBackEnd.Domain.Entities.Identity;
 using GlovoBackEnd.Domain.Entities.Partner;
 using GlovoBackEnd.Domain.Entities.Company;
+using GlovoBackEnd.Domain.Enums;
 using Microsoft.AspNetCore.Identity; // Contains your ApplicationUser & ApplicationRole
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -93,6 +94,9 @@ public class AppDbContext : IdentityDbContext<
             company.Property(x => x.Name).HasMaxLength(120).IsRequired();
             company.Property(x => x.NormalizedName).HasMaxLength(120).IsRequired();
             company.Property(x => x.Description).HasMaxLength(1_000).IsRequired();
+            company.Property(x => x.Status).HasConversion<string>().HasMaxLength(16).HasDefaultValue(CompanyStatus.Pending).IsRequired();
+            company.Property(x => x.ModerationComment).HasMaxLength(1_000);
+            company.HasIndex(x => x.Status);
             company.HasOne(x => x.Owner)
                 .WithMany(x => x.Companies)
                 .HasForeignKey(x => x.OwnerId)

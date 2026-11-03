@@ -18,7 +18,7 @@ const CreateCompanyPage = () => {
         setFieldErrors({});
         try {
             const company = await createCompany({name, description}).unwrap();
-            setMessage(`${company.name} was created successfully.`);
+            setMessage(`${company.name} was submitted for review. It will become active after approval.`);
             setName("");
             setDescription("");
         } catch (error) {
@@ -35,7 +35,7 @@ const CreateCompanyPage = () => {
                                                         to="/dashboard">← Back to dashboard</Link><p
         className="mt-10 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Company</p><h1
         className="mt-2 text-3xl font-bold text-slate-900">Create company</h1><p className="mt-2 text-slate-600">Create
-        the company that you will manage as a partner.</p>
+        the company that you will manage as a partner. New applications are reviewed before activation.</p>
         <section className="mt-8 rounded-xl border border-slate-200 bg-white p-7 shadow-sm">
             <form className="space-y-5" onSubmit={submit}><label className="block text-sm font-medium text-slate-700">Company
                 name<input aria-invalid={Boolean(fieldErrors.name)}
@@ -51,7 +51,7 @@ const CreateCompanyPage = () => {
                 <span className="mt-1 block text-xs font-normal text-red-700">{fieldErrors.description[0]}</span>}
             </label>
                 <button className="rounded bg-emerald-600 px-4 py-2 font-medium text-white disabled:opacity-60"
-                        disabled={isLoading}>{isLoading ? "Creating…" : "Create company"}</button>
+                        disabled={isLoading}>{isLoading ? "Submitting…" : "Submit for review"}</button>
                 {message &&
                     <p className={`rounded p-3 text-sm ${failed ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"}`}>{message}</p>}
             </form>

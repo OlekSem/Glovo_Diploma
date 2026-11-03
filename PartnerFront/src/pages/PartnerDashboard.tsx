@@ -28,6 +28,8 @@ const PartnerDashboard = () => {
                 account</Link>
             <Link className="rounded border border-emerald-700 px-4 py-2 text-emerald-700" to="/companies/new">Create
                 company</Link>
+            <Link className="rounded border border-emerald-700 px-4 py-2 text-emerald-700" to="/companies">Active companies</Link>
+            <Link className="rounded border border-emerald-700 px-4 py-2 text-emerald-700" to="/company-requests">My applications</Link>
             <button className="rounded bg-slate-800 px-4 py-2 text-white" onClick={signOut}>Log out</button>
         </div>
     </main>;
