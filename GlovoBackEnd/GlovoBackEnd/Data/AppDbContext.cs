@@ -28,6 +28,7 @@ public class AppDbContext : IdentityDbContext<
     public DbSet<PartnerRoleEntity> PartnerRoles => Set<PartnerRoleEntity>();
     public DbSet<PartnerUserRoleEntity> PartnerUserRoles => Set<PartnerUserRoleEntity>();
     public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
+    public DbSet<CompanyBranchEntity> CompanyBranches => Set<CompanyBranchEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -94,12 +95,32 @@ public class AppDbContext : IdentityDbContext<
             company.Property(x => x.Name).HasMaxLength(120).IsRequired();
             company.Property(x => x.NormalizedName).HasMaxLength(120).IsRequired();
             company.Property(x => x.Description).HasMaxLength(1_000).IsRequired();
+            company.Property(x => x.Category).HasMaxLength(120);
+            company.Property(x => x.Subcategory).HasMaxLength(120);
+            company.Property(x => x.IconUrl).HasMaxLength(2_000);
+            company.Property(x => x.BannerUrl).HasMaxLength(2_000);
             company.Property(x => x.Status).HasConversion<string>().HasMaxLength(16).HasDefaultValue(CompanyStatus.Pending).IsRequired();
             company.Property(x => x.ModerationComment).HasMaxLength(1_000);
             company.HasIndex(x => x.Status);
             company.HasOne(x => x.Owner)
                 .WithMany(x => x.Companies)
                 .HasForeignKey(x => x.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompanyBranchEntity>(branch =>
+        {
+            branch.ToTable("CompanyBranches");
+            branch.Property(x => x.Phone).HasMaxLength(32).IsRequired();
+            branch.Property(x => x.Email).HasMaxLength(254).IsRequired();
+            branch.Property(x => x.Locality).HasMaxLength(120).IsRequired();
+            branch.Property(x => x.Region).HasMaxLength(120).IsRequired();
+            branch.Property(x => x.Address).HasMaxLength(250).IsRequired();
+            branch.Property(x => x.PostalCode).HasMaxLength(12).IsRequired();
+            branch.HasIndex(x => x.CompanyId);
+            branch.HasOne(x => x.Company)
+                .WithMany(x => x.Branches)
+                .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

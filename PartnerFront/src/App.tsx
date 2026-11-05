@@ -15,6 +15,7 @@ import PartnerProfilePage from "./pages/PartnerProfilePage.tsx";
 import CreateCompanyPage from "./pages/CreateCompanyPage.tsx";
 import CompanyRequestsPage from "./pages/CompanyRequestsPage.tsx";
 import ActiveCompaniesPage from "./pages/ActiveCompaniesPage.tsx";
+import CompanyManagementPage from "./pages/CompanyManagementPage.tsx";
 
 function App() {
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="/profile" element={<PartnerProfilePage />} />
           <Route path="/companies/new" element={<CreateCompanyPage />} />
           <Route path="/companies" element={<ActiveCompaniesPage />} />
+          <Route path="/companies/:companyId" element={<CompanyManagementPage />} />
           <Route path="/company-requests" element={<CompanyRequestsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
