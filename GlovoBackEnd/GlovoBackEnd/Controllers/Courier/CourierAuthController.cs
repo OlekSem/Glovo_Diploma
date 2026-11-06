@@ -123,6 +123,10 @@ public class CourierAuthController(
             {
                 return BadRequest(new { message = "Invalid or expired confirmation token." });
             }
+            user.EmailConfirmed = true;
+            var update = await userManager.UpdateAsync(user);
+            if (!update.Succeeded)
+                return BadRequest(update.Errors);
 
             return Ok(new { message = "Thank you for confirming your email. You can now log in." });
         }

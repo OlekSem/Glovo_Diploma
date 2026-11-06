@@ -68,3 +68,24 @@ public sealed record AdminCompanyResponseDto(
 public sealed record ModerateCompanyDto(
     [StringLength(1_000)] string? Comment
 );
+public sealed record ClientCompanyResponseDto(
+    Guid Id,
+    string Name,
+    string Description,
+    string? Category,
+    string? Subcategory,
+    string? IconUrl,
+    string? BannerUrl,
+    int BranchesCount
+);
+public sealed record ClientCompanyBranchResponseDto(
+    Guid Id,
+    Guid CompanyId,
+    string Phone,
+    string Email,
+    string Locality,
+    string Region,
+    string Address
+);
+
+
