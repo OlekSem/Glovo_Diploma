@@ -3,10 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { AuthStackParamList } from "../../../../App";
 
 import {SafeAreaView} from "react-native-safe-area-context";
+import {useRouter} from "expo-router";
 
 // 1. Schematy walidacji dla poszczególnych kroków
 const emailSchema = z.object({
@@ -14,7 +13,7 @@ const emailSchema = z.object({
 });
 
 const otpSchema = z.object({
-  otp: z.string().length(4, "Kod musi składać się z 4 cyfr"),
+  otp: z.string().length(6, "The code must be 6 numbers long"),
 });
 
 const passwordSchema = z.object({
@@ -24,11 +23,10 @@ const passwordSchema = z.object({
     .regex(/[0-9]/, "Minimum jedna cyfra"),
 });
 
-type Props = NativeStackScreenProps<AuthStackParamList, "SignUp">;
-
-export default function SignUpScreen({ navigation }: Props) {
+export default function PasswordScreen() {
   const [step, setStep] = useState<"email" | "otp" | "password" | "success">("email");
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   // Krok 1: Formularz Email
   const emailForm = useForm<{ email: string }>({
@@ -78,7 +76,7 @@ export default function SignUpScreen({ navigation }: Props) {
   const handleBack = () => {
     if (step === "otp") setStep("email");
     else if (step === "password") setStep("otp");
-    else navigation.goBack();
+    else router.back();
   };
 
   return (
@@ -99,7 +97,6 @@ export default function SignUpScreen({ navigation }: Props) {
 
           <View className="flex-1 justify-center mt-6">
 
-            {/* KROK 1: WPISYWANIE EMAILA */}
             {step === "email" && (
               <View>
                 <Text className="text-sm text-gray-500 mb-2">Your email</Text>
@@ -228,7 +225,7 @@ export default function SignUpScreen({ navigation }: Props) {
                   Your account was successfully created
                 </Text>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate("Login")}
+                  onPress={() => navigation.navigate("/")}
                   className="w-full h-14 bg-gray-400 rounded-full justify-center items-center mt-8"
                 >
                   <Text className="text-white text-base font-semibold">Let's go</Text>

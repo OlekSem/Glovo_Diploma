@@ -6,7 +6,7 @@ import {createNativeStackNavigator} from "@react-navigation/native-stack";
 
 import WelcomeScreen from "./src/features/auth/screens/WelcomeScreen";
 import LoginScreen from "./src/features/auth/screens/LoginScreen";
-import SignUpScreen from "./src/features/auth/screens/SignUpScreen";
+import EmailScreen from "@/features/auth/screens/singup/EmailScreen";
 
 import "./global.css";
 
@@ -31,7 +31,7 @@ export default function App() {
         >
           <Stack.Screen name={"Welcome"} component={WelcomeScreen}/>
           <Stack.Screen name={"Login"} component={LoginScreen}/>
-          <Stack.Screen name={"SignUp"} component={SignUpScreen}/>
+          <Stack.Screen name={"SignUp"} component={EmailScreen}/>
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

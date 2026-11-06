@@ -2,6 +2,7 @@
   "expo": {
     "name": "CourierFront",
     "slug": "CourierFront",
+    "scheme": "CourierFront-scheme",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,6 +22,10 @@
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-router"
+    ]
   }
 }

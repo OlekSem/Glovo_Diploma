@@ -18,3 +18,8 @@ public record ChangePasswordDto(
     [Required, StringLength(128, MinimumLength = 6)] string NewPassword);
 
 public record ResendConfirmationEmailDto([Required, EmailAddress, StringLength(254)] string Email);
+
+public class RefreshTokenDto
+{
+    public required string RefreshToken { get; set; }
+}

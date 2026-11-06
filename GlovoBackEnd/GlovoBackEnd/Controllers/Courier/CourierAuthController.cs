@@ -14,8 +14,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
-
-
 [ApiController]
 [Route("api/courier/auth")]
 public class CourierAuthController(
@@ -62,26 +60,24 @@ public class CourierAuthController(
             return BadRequest(roleResult.Errors);
         }
         
-        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
         
-        // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
+        var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
 
-        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
-        
-        // send the email via service
-        //todo change the subject and possibly add a beautiful html message
+        code = WebEncoders.Base64UrlEncode(
+            Encoding.UTF8.GetBytes(code)
+        );
+
         try
         {
             await emailService.SendEmailAsync(
-                user.Email,
+                user.Email!,
                 "Confirm Your Glovo Courier Account",
-                $"Please confirm your account by this code: {code}.");
+                $"Your confirmation code is: {code}"
+            );
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Email Error] Failed to send confirmation email: {ex.Message}");
+            // Log the exception using ILogger in production.
         }
         
         //todo rm this when deploying
@@ -101,34 +97,45 @@ public class CourierAuthController(
     }
 
     [HttpPost("confirm-email")]
-    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
+    public async Task<IActionResult> ConfirmEmail(
+        [FromBody] ConfirmEmailDto dto)
     {
         var user = await userManager.FindByIdAsync(dto.UserId);
+
         if (user == null)
-        {
-            return BadRequest(new { message = "Invalid email confirmation request." });
-        }
+            return BadRequest(new { message = "Invalid confirmation request." });
 
         if (user.EmailConfirmed)
-        {
-            return BadRequest(new { message = "Email is already confirmed. You can log in." });
-        }
+            return BadRequest(new { message = "Email already confirmed." });
 
         try
         {
-            //var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            //var result = await userManager.ConfirmEmailAsync(user, decodedToken);
-            var res = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, dto.Code);
-            if (!res)
+            var decodedToken = Encoding.UTF8.GetString(
+                WebEncoders.Base64UrlDecode(dto.Code)
+            );
+
+            var result = await userManager.ConfirmEmailAsync(
+                user,
+                decodedToken
+            );
+
+            if (!result.Succeeded)
             {
-                return BadRequest(new { message = "Invalid or expired confirmation token." });
+                return BadRequest(new
+                {
+                    message = "Invalid or expired confirmation token.",
+                    errors = result.Errors
+                });
             }
 
-            return Ok(new { message = "Thank you for confirming your email. You can now log in." });
+            return Ok(new
+            {
+                message = "Email successfully confirmed. You can now log in."
+            });
         }
         catch (FormatException)
         {
-            return BadRequest(new { message = "Invalid email confirmation request." });
+            return BadRequest(new { message = "Invalid confirmation token." });
         }
     }
 
@@ -180,22 +187,52 @@ public class CourierAuthController(
         });
 }
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginCourierDto dto)
+    public async Task<IActionResult> Login(
+        [FromBody] LoginCourierDto dto)
     {
         var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
-            return Unauthorized(new { message = "Invalid email or password." });
 
-        if (!await userManager.IsEmailConfirmedAsync(user))
-            return Unauthorized(new { message = "Please confirm your email address before logging in." });
-        
+        if (user == null ||
+            !await userManager.CheckPasswordAsync(user, dto.Password))
+        {
+            return Unauthorized(new
+            {
+                message = "Invalid email or password."
+            });
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            return Unauthorized(new
+            {
+                message = "Please confirm your email address before logging in."
+            });
+        }
+
         if (!await userManager.IsInRoleAsync(user, CourierRole))
             return Forbid();
 
         var auth = await jwtTokenService.CreateAuthResponse(user);
-        SetAuthCookies(auth);
 
-        return Ok(new AuthCourierResponseDto(user.ToCourierResponseDto()));
+        // Optional browser authentication.
+        // React Native uses the response body instead.
+        if (Request.Headers.UserAgent.ToString().Contains("Mozilla"))
+        {
+            SetAuthCookies(auth);
+        }
+
+        return Ok(new
+        {
+            message = "Login successful.",
+
+            user = user.ToCourierResponseDto(),
+
+            tokens = new
+            {
+                accessToken = auth.AccessToken,
+                refreshToken = auth.RefreshToken
+            }
+        });
     }
 
     [HttpPost("forgot-password")]
@@ -241,76 +278,161 @@ public class CourierAuthController(
     }
 
     [HttpPost("reset-password")]
-    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordDto dto)
     {
         var user = await userManager.FindByEmailAsync(dto.Email);
+
         if (user == null)
-            return BadRequest(new { message = "Invalid password reset request." });
+        {
+            return BadRequest(new
+            {
+                message = "Invalid password reset request."
+            });
+        }
+
         try
         {
-            var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            var result = await userManager.ResetPasswordAsync(user, decodedToken, dto.NewPassword);
+            var decodedToken = Encoding.UTF8.GetString(
+                WebEncoders.Base64UrlDecode(dto.Token)
+            );
+
+            var result = await userManager.ResetPasswordAsync(
+                user,
+                decodedToken,
+                dto.NewPassword
+            );
 
             if (!result.Succeeded)
             {
-                return BadRequest(new { message = "Failed to reset password.", errors = result.Errors });
+                return BadRequest(new
+                {
+                    message = "Failed to reset password.",
+                    errors = result.Errors
+                });
             }
-            
-            // 🚀 GLOBAL LOGOUT: Clear refresh token so ALL active sessions on all devices are killed
+
+            // Invalidate all refresh sessions.
             user.RefreshToken = null;
             user.RefreshTokenExpiry = null;
-            await userManager.UpdateAsync(user);
-            return Ok(new { message = "Password has been successfully reset. You can now log in." });
+
+            var updateResult = await userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Password was changed, but session invalidation failed."
+                });
+            }
+
+            return Ok(new
+            {
+                message = "Password successfully reset. Please log in again."
+            });
         }
         catch (FormatException)
         {
-            return BadRequest(new { message = "Invalid token format." });
+            return BadRequest(new
+            {
+                message = "Invalid token format."
+            });
         }
     }
 
     [HttpPost("change-password")]
     [Authorize(Roles = CourierRole)]
-    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordDto dto)
     {
         var user = await GetCurrentUserAsync();
+
         if (user == null)
         {
-            return NotFound(new { message = "Courier user not found." });
+            return NotFound(new
+            {
+                message = "Courier user not found."
+            });
         }
-        var result = await userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+
+        var result = await userManager.ChangePasswordAsync(
+            user,
+            dto.CurrentPassword,
+            dto.NewPassword
+        );
+
         if (!result.Succeeded)
         {
-            return BadRequest(new { message = "Failed to change password.", errors = result.Errors });
+            return BadRequest(new
+            {
+                message = "Failed to change password.",
+                errors = result.Errors
+            });
         }
-        
-        // 1. Kill the refresh token in the database
+
+        // Revoke refresh token.
         user.RefreshToken = null;
         user.RefreshTokenExpiry = null;
-        await userManager.UpdateAsync(user);
 
-        // 2. Delete the auth cookies from the browser immediately
+        var updateResult = await userManager.UpdateAsync(user);
+
+        if (!updateResult.Succeeded)
+        {
+            return StatusCode(500, new
+            {
+                message = "Password changed, but session invalidation failed."
+            });
+        }
+
+        // Delete browser authentication cookies.
         DeleteAuthCookies();
-        
-        return Ok(new { message = "Password has been successfully changed. You have been logged out." });
+
+        return Ok(new
+        {
+            message = "Password successfully changed. Please log in again."
+        });
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh()
+    public async Task<IActionResult> Refresh(
+        [FromBody] RefreshTokenDto dto)
     {
-        var refreshToken = Request.Cookies[RefreshCookie];
-        if (string.IsNullOrEmpty(refreshToken))
-            return Unauthorized(new { message = "Refresh token is missing." });
+        if (string.IsNullOrWhiteSpace(dto.RefreshToken))
+        {
+            return Unauthorized(new
+            {
+                message = "Refresh token is required."
+            });
+        }
 
         try
         {
-            var auth = await jwtTokenService.RefreshTokenAsync(refreshToken);
+            var auth = await jwtTokenService.RefreshTokenAsync(
+                dto.RefreshToken
+            );
+
+            // Optional web cookies.
             SetAuthCookies(auth);
-            return Ok(new { message = "Token refreshed." });
+
+            return Ok(new
+            {
+                message = "Token refreshed successfully.",
+
+                tokens = new
+                {
+                    accessToken = auth.AccessToken,
+                    refreshToken = auth.RefreshToken
+                }
+            });
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             DeleteAuthCookies();
-            return Unauthorized(new { message = ex.Message });
+
+            return Unauthorized(new
+            {
+                message = "Invalid or expired refresh token. Please log in again."
+            });
         }
     }
 
@@ -326,14 +448,22 @@ public class CourierAuthController(
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(
+        [FromBody] RefreshTokenDto dto)
     {
-        var refreshToken = Request.Cookies[RefreshCookie];
-        if (!string.IsNullOrEmpty(refreshToken))
-            await jwtTokenService.RevokeRefreshTokenAsync(refreshToken);
+        if (!string.IsNullOrWhiteSpace(dto.RefreshToken))
+        {
+            await jwtTokenService.RevokeRefreshTokenAsync(
+                dto.RefreshToken
+            );
+        }
 
         DeleteAuthCookies();
-        return Ok(new { message = "Logged out successfully." });
+
+        return Ok(new
+        {
+            message = "Logged out successfully."
+        });
     }
 
     private async Task<UserEntity?> GetCurrentUserAsync()
