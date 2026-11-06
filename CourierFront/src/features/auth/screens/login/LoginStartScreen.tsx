@@ -41,7 +41,7 @@ export default function LoginStartScreen() {
             Don't have an account?
           </Text>
           <TouchableOpacity
-            onPress={() => router.push("/(auth)/login")}
+            onPress={() => router.push("/(auth)/signup")}
             activeOpacity={0.6}
           >
             <Text className="text-sm text-gray-900 font-bold underline">

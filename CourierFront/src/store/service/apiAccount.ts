@@ -36,6 +36,27 @@ export interface RefreshRequest {
   refreshToken: string;
 }
 
+export interface RegisterResponse {
+  message: string;
+  userId: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface ConfirmEmailRequest {
+  email: string;
+  code: string;
+}
+
+export interface ConfirmEmailResponse {
+  message: string;
+}
+
 export const apiAccount = createApi({
   reducerPath: "apiAccount",
   baseQuery: baseQueryWithReauth,
@@ -45,6 +66,14 @@ export const apiAccount = createApi({
     login: builder.mutation<LoginResponse, LoginRequest>({
       query: (body) => ({
         url: "/api/courier/auth/login",
+        method: "POST",
+        body,
+      }),
+    }),
+
+    register: builder.mutation<RegisterResponse, RegisterRequest>({
+      query: (body) => ({
+        url: "/api/courier/auth/register",
         method: "POST",
         body,
       }),
@@ -99,13 +128,24 @@ export const apiAccount = createApi({
         body,
       }),
     }),
+
+    confirmEmail: builder.mutation<ConfirmEmailResponse, ConfirmEmailRequest>({
+      query: (body) => ({ url: "/api/courier/auth/confirm-email", method: "POST", body }),
+    }),
+
+    resendConfirmationEmail: builder.mutation<{ message: string }, { email: string }>({
+      query: (body) => ({ url: "/api/courier/auth/resend-confirmation-email", method: "POST", body }),
+    }),
   }),
 });
 
 export const {
   useLoginMutation,
+  useRegisterMutation,
   useRefreshMutation,
   useLogoutMutation,
   useGetMeQuery,
   useChangePasswordMutation,
+  useConfirmEmailMutation,
+  useResendConfirmationEmailMutation
 } = apiAccount;

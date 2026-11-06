@@ -22,3 +22,9 @@ public sealed record CourierResponseDto(
 );
 
 public sealed record AuthCourierResponseDto(CourierResponseDto Courier);
+
+public class ConfirmCourierEmailDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+}
