@@ -127,6 +127,10 @@ public class CourierAuthController(
                     errors = result.Errors
                 });
             }
+            user.EmailConfirmed = true;
+            var update = await userManager.UpdateAsync(user);
+            if (!update.Succeeded)
+                return BadRequest(update.Errors);
 
             return Ok(new
             {

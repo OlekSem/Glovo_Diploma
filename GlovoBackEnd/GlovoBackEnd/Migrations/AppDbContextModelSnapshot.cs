@@ -22,11 +22,71 @@ namespace GlovoBackEnd.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Locality")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("PostalCode")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)");
+
+                    b.Property<string>("Region")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("CompanyBranches", (string)null);
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("BannerUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.Property<DateTime>("DateCreated")
                         .HasColumnType("timestamp with time zone");
@@ -35,6 +95,10 @@ namespace GlovoBackEnd.Migrations
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("IconUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -68,6 +132,10 @@ namespace GlovoBackEnd.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
                         .HasDefaultValue("Pending");
+
+                    b.Property<string>("Subcategory")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
 
                     b.HasKey("Id");
 
@@ -433,6 +501,17 @@ namespace GlovoBackEnd.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", "Company")
+                        .WithMany("Branches")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", b =>
                 {
                     b.HasOne("GlovoBackEnd.Domain.Entities.Partner.PartnerEntity", "Owner")
@@ -524,6 +603,11 @@ namespace GlovoBackEnd.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", b =>
+                {
+                    b.Navigation("Branches");
                 });
 
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.RoleEntity", b =>
