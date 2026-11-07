@@ -86,7 +86,9 @@ builder.Services.AddAuthentication(options =>
                         "JWT signing key is not configured."))),
 
             RoleClaimType = ClaimTypes.Role,
-            NameClaimType = "username"
+            NameClaimType = "username",
+            
+            ClockSkew = TimeSpan.FromSeconds(30)
         };
 
         options.Events = new JwtBearerEvents

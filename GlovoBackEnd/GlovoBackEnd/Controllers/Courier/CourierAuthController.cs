@@ -1,20 +1,14 @@
-using System.Text;
-using Microsoft.AspNetCore.WebUtilities;
-
-namespace GlovoBackEnd.Controllers.Courier;
-
 using System.Security.Claims;
-
 using GlovoBackEnd.Domain.Entities.Identity;
 using GlovoBackEnd.Mappers;
-using GlovoBackEnd.Models.Dtos.Courier;
 using GlovoBackEnd.Models.Dtos.Common;
+using GlovoBackEnd.Models.Dtos.Courier;
 using GlovoBackEnd.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
-
+namespace GlovoBackEnd.Controllers.Courier;
 
 [ApiController]
 [Route("api/courier/auth")]
@@ -22,19 +16,17 @@ public class CourierAuthController(
     UserManager<UserEntity> userManager,
     RoleManager<RoleEntity> roleManager,
     IJwtTokenService jwtTokenService,
-    IEmailService emailService,
-    IConfiguration configuration) : ControllerBase
+    IEmailService emailService) : ControllerBase
 {
     private const string CourierRole = "Courier";
     private const string AccessCookie = "courier_access_token";
     private const string RefreshCookie = "courier_refresh_token";
     private const string RefreshCookiePath = "/api/courier/auth";
-    private readonly string _frontendUrl = configuration["AppSettings:FrontendUrl"] ?? "http://localhost:5173";
+    private const string ResetPurpose = "CourierResetPassword";
 
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterCourierDto dto)
     {
-        
         if (await userManager.FindByEmailAsync(dto.Email) != null)
             return BadRequest(new { message = "User with this email already exists." });
 
@@ -58,218 +50,129 @@ public class CourierAuthController(
         var roleResult = await userManager.AddToRoleAsync(user, CourierRole);
         if (!roleResult.Succeeded)
         {
-            await userManager.DeleteAsync(user); // Rollback if the role was not added to the user
+            await userManager.DeleteAsync(user);
             return BadRequest(roleResult.Errors);
         }
-        
-        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
-        
-        // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
 
-        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
-        
-        // send the email via service
-        //todo change the subject and possibly add a beautiful html message
-        try
-        {
-            await emailService.SendEmailAsync(
-                user.Email,
-                "Confirm Your Glovo Courier Account",
-                $"Please confirm your account by this code: {code}.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Email Error] Failed to send confirmation email: {ex.Message}");
-        }
-        
-        //todo rm this when deploying
-        // REMOVE THESE BEFORE DEPLOYING
-        Console.WriteLine($"\n==================================================");
-        Console.WriteLine($"[SWAGGER DEV] Confirmation Token for {user.Email}:");
-        Console.WriteLine($"UserId: {user.Id}");
-        Console.WriteLine($"Token: {code}");
-        Console.WriteLine($"==================================================\n");
+        var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
+        await SendEmailAsync(user.Email!, "Confirm Your Glovo Courier Account",
+            $"Please confirm your account with this code: <strong>{code}</strong>.");
+        DevLog("Confirmation code", user, code);
 
         return Ok(new
         {
-            message = "Registration successful. Please check your email (or backend console) to confirm your account.",
-            devUserId = user.Id, // REMOVE THESE BEFORE DEPLOYING
-            devToken = code, // REMOVE THESE BEFORE DEPLOYING
+            message = "Registration successful. Enter the confirmation code sent to your email.",
+            // userId = user.Id
         });
     }
 
     [HttpPost("confirm-email")]
-    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
+    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmCourierEmailDto dto)
     {
-        var user = await userManager.FindByIdAsync(dto.UserId);
-        if (user == null)
-        {
-            return BadRequest(new { message = "Invalid email confirmation request." });
-        }
+        const string invalid = "Invalid or expired confirmation code.";
 
-        if (user.EmailConfirmed)
-        {
-            return BadRequest(new { message = "Email is already confirmed. You can log in." });
-        }
+        var user = await FindCourierByEmailAsync(dto.Email);
+        if (user == null || user.EmailConfirmed)
+            return BadRequest(new { message = invalid });
 
-        try
-        {
-            //var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            //var result = await userManager.ConfirmEmailAsync(user, decodedToken);
-            var res = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, dto.Code);
-            if (!res)
-            {
-                return BadRequest(new { message = "Invalid or expired confirmation token." });
-            }
-            user.EmailConfirmed = true;
-            var update = await userManager.UpdateAsync(user);
-            if (!update.Succeeded)
-                return BadRequest(update.Errors);
+        var valid = await userManager.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider, dto.Code);
+        if (!valid)
+            return BadRequest(new { message = invalid });
 
-            return Ok(new { message = "Thank you for confirming your email. You can now log in." });
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = "Invalid email confirmation request." });
-        }
+        user.EmailConfirmed = true;
+        var update = await userManager.UpdateAsync(user);
+        if (!update.Succeeded)
+            return StatusCode(500, new { message = "Could not confirm email." });
+
+        return Ok(new { message = "Email confirmed. You can now log in." });
     }
 
     [HttpPost("resend-confirmation-email")]
     public async Task<IActionResult> ResendConfirmationEmail([FromBody] ResendConfirmationEmailDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
+        const string generic = "If your account exists and is unconfirmed, a new confirmation code has been sent.";
+
+        var user = await FindCourierByEmailAsync(dto.Email);
         if (user == null || user.EmailConfirmed)
-        {
-            // not revealing if the email exists
-            return Ok(new { message = "If your account exists and is unconfirmed, a new confirmation token has been sent." });
-        }
-        
-        //var code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        //code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+            return Ok(new { message = generic });
+
         var code = await userManager.GenerateTwoFactorTokenAsync(user, TokenOptions.DefaultEmailProvider);
-        
-        // Dynamically grabs from appsettings.Development.json (or falls back to localhost)
+        await SendEmailAsync(user.Email!, "Confirm Your Glovo Courier Account",
+            $"Please confirm your account with this code: <strong>{code}</strong>.");
+        DevLog("Resent confirmation code", user, code);
 
-        //var confirmationLink = $"{_frontendUrl}/client/confirm-email?userId={user.Id}&token={code}";
-        
-        // send the email via service
-        //todo change the subject and possibly add a beautiful html message
-        try
-        {
-            await emailService.SendEmailAsync(
-                user.Email,
-                "Confirm Your Glovo Courier Account",
-                $"Please confirm your account by this code: {code}.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Email Error] Failed to resend confirmation email: {ex.Message}");
-        }
-        
-        //todo rm this when deploying
-        // REMOVE THESE BEFORE DEPLOYING
-        Console.WriteLine($"\n==================================================");
-        Console.WriteLine($"[SWAGGER DEV] Resent Confirmation Token for {user.Email}:");
-        Console.WriteLine($"UserId: {user.Id}");
-        Console.WriteLine($"Token: {code}");
-        Console.WriteLine($"==================================================\n");
+        return Ok(new { message = generic});
+    }
 
-        return Ok(new
-        {
-            message = "If your account exists and is unconfirmed, a new confirmation token has been sent.",
-            devUserId = user.Id, // REMOVE THESE BEFORE DEPLOYING
-            devToken = code, // REMOVE THESE BEFORE DEPLOYING
-        });
-}
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginCourierDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
+        var user = await FindCourierByEmailAsync(dto.Email);
         if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
             return Unauthorized(new { message = "Invalid email or password." });
 
-        if (!await userManager.IsEmailConfirmedAsync(user))
+        if (!user.EmailConfirmed)
             return Unauthorized(new { message = "Please confirm your email address before logging in." });
-        
-        if (!await userManager.IsInRoleAsync(user, CourierRole))
-            return Forbid();
 
         var auth = await jwtTokenService.CreateAuthResponse(user);
-        SetAuthCookies(auth);
 
-        return Ok(new AuthCourierResponseDto(user.ToCourierResponseDto()));
+        // Browsers get cookies; React Native reads the tokens from the body.
+        if (IsBrowser())
+            SetAuthCookies(auth);
+
+        return Ok(new
+        {
+            message = "Login successful.",
+            user = user.ToCourierResponseDto(),
+            tokens = new { accessToken = auth.AccessToken, refreshToken = auth.RefreshToken }
+        });
     }
 
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null || !await userManager.IsEmailConfirmedAsync(user))
-        {
-            return Ok(new { message = "If your email is registered and confirmed, a password reset link has been sent." });
-        }
-        var code = await userManager.GeneratePasswordResetTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        
-        var resetLink = $"{_frontendUrl}/courier/reset-password?email={user.Email}&token={code}";
-        
-        try
-        {
-            //todo change the subject and possibly add a beautiful html message
-            await emailService.SendEmailAsync(
-                user.Email,
-                "Reset Your Password",
-                $"Reset your password by clicking <a href='{resetLink}'>here</a>.");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Email Error] Failed to send password reset email: {ex.Message}");
-        }
+        const string generic = "If your email is registered and confirmed, a password reset code has been sent.";
 
-        //todo rm this when deploying
-        // REMOVE THESE BEFORE DEPLOYING
-        Console.WriteLine($"\n==================================================");
-        Console.WriteLine($"[SWAGGER DEV] Reset Token for {user.Email}:");
-        Console.WriteLine($"Email: {user.Email}");
-        Console.WriteLine($"Token: {code}");
-        Console.WriteLine($"==================================================\n");
+        var user = await FindCourierByEmailAsync(dto.Email);
+        if (user == null || !user.EmailConfirmed)
+            return Ok(new { message = generic });
 
-        return Ok(new
-        {
-            message = "If your email is registered and confirmed, a password reset link has been sent.",
-            devEmail = user.Email, // REMOVE THESE BEFORE DEPLOYING
-            devToken = code // REMOVE THESE BEFORE DEPLOYING
-        });
+        var code = await userManager.GenerateUserTokenAsync(user, TokenOptions.DefaultEmailProvider, ResetPurpose);
+        await SendEmailAsync(user.Email!, "Reset Your Password",
+            $"Your password reset code is: <strong>{code}</strong>.");
+        DevLog("Password reset code", user, code);
+
+        return Ok(new { message = generic });
     }
 
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null)
-            return BadRequest(new { message = "Invalid password reset request." });
-        try
-        {
-            var decodedToken = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(dto.Token));
-            var result = await userManager.ResetPasswordAsync(user, decodedToken, dto.NewPassword);
+        const string invalid = "Invalid or expired password reset request.";
 
-            if (!result.Succeeded)
-            {
-                return BadRequest(new { message = "Failed to reset password.", errors = result.Errors });
-            }
-            
-            // 🚀 GLOBAL LOGOUT: Clear refresh token so ALL active sessions on all devices are killed
-            user.RefreshToken = null;
-            user.RefreshTokenExpiry = null;
-            await userManager.UpdateAsync(user);
-            return Ok(new { message = "Password has been successfully reset. You can now log in." });
-        }
-        catch (FormatException)
-        {
-            return BadRequest(new { message = "Invalid token format." });
-        }
+        var user = await FindCourierByEmailAsync(dto.Email);
+        if (user == null)
+            return BadRequest(new { message = invalid });
+
+        // dto.Token carries the 6-digit code.
+        var valid = await userManager.VerifyUserTokenAsync(
+            user, TokenOptions.DefaultEmailProvider, ResetPurpose, dto.Token);
+        if (!valid)
+            return BadRequest(new { message = invalid });
+
+        // Code is valid: use an internal Identity token so password rules still apply.
+        var identityToken = await userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await userManager.ResetPasswordAsync(user, identityToken, dto.NewPassword);
+        if (!result.Succeeded)
+            return BadRequest(new { message = "Failed to reset password.", errors = result.Errors });
+
+        user.RefreshToken = null;
+        user.RefreshTokenExpiry = null;
+        var update = await userManager.UpdateAsync(user);
+        if (!update.Succeeded)
+            return StatusCode(500, new { message = "Password changed, but session invalidation failed." });
+
+        return Ok(new { message = "Password successfully reset. Please log in again." });
     }
 
     [HttpPost("change-password")]
@@ -278,43 +181,48 @@ public class CourierAuthController(
     {
         var user = await GetCurrentUserAsync();
         if (user == null)
-        {
             return NotFound(new { message = "Courier user not found." });
-        }
+
         var result = await userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
         if (!result.Succeeded)
-        {
             return BadRequest(new { message = "Failed to change password.", errors = result.Errors });
-        }
-        
-        // 1. Kill the refresh token in the database
+
         user.RefreshToken = null;
         user.RefreshTokenExpiry = null;
-        await userManager.UpdateAsync(user);
+        var update = await userManager.UpdateAsync(user);
+        if (!update.Succeeded)
+            return StatusCode(500, new { message = "Password changed, but session invalidation failed." });
 
-        // 2. Delete the auth cookies from the browser immediately
         DeleteAuthCookies();
-        
-        return Ok(new { message = "Password has been successfully changed. You have been logged out." });
+        return Ok(new { message = "Password successfully changed. Please log in again." });
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh()
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto? dto)
     {
-        var refreshToken = Request.Cookies[RefreshCookie];
-        if (string.IsNullOrEmpty(refreshToken))
-            return Unauthorized(new { message = "Refresh token is missing." });
+        var refreshToken = !string.IsNullOrWhiteSpace(dto?.RefreshToken)
+            ? dto!.RefreshToken
+            : Request.Cookies[RefreshCookie];
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            return Unauthorized(new { message = "Refresh token is required." });
 
         try
         {
             var auth = await jwtTokenService.RefreshTokenAsync(refreshToken);
-            SetAuthCookies(auth);
-            return Ok(new { message = "Token refreshed." });
+            if (IsBrowser())
+                SetAuthCookies(auth);
+
+            return Ok(new
+            {
+                message = "Token refreshed successfully.",
+                tokens = new { accessToken = auth.AccessToken, refreshToken = auth.RefreshToken }
+            });
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             DeleteAuthCookies();
-            return Unauthorized(new { message = ex.Message });
+            return Unauthorized(new { message = "Invalid or expired refresh token. Please log in again." });
         }
     }
 
@@ -323,32 +231,64 @@ public class CourierAuthController(
     public async Task<IActionResult> GetMe()
     {
         var user = await GetCurrentUserAsync();
-        if (user == null)
-            return NotFound(new { message = "Courier user not found." });
-
-        return Ok(user.ToCourierResponseDto());
+        return user == null
+            ? NotFound(new { message = "Courier user not found." })
+            : Ok(user.ToCourierResponseDto());
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenDto? dto)
     {
-        var refreshToken = Request.Cookies[RefreshCookie];
-        if (!string.IsNullOrEmpty(refreshToken))
+        var refreshToken = !string.IsNullOrWhiteSpace(dto?.RefreshToken)
+            ? dto!.RefreshToken
+            : Request.Cookies[RefreshCookie];
+
+        if (!string.IsNullOrWhiteSpace(refreshToken))
             await jwtTokenService.RevokeRefreshTokenAsync(refreshToken);
 
         DeleteAuthCookies();
         return Ok(new { message = "Logged out successfully." });
     }
 
+    // ---------- helpers ----------
+
+    private bool IsBrowser() => Request.Headers.UserAgent.ToString().Contains("Mozilla");
+
+    private async Task<UserEntity?> FindCourierByEmailAsync(string email)
+    {
+        var user = await userManager.FindByEmailAsync(email);
+        return user != null && await userManager.IsInRoleAsync(user, CourierRole) ? user : null;
+    }
+
+    private async Task<UserEntity?> FindCourierByIdAsync(string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        return user != null && await userManager.IsInRoleAsync(user, CourierRole) ? user : null;
+    }
+
     private async Task<UserEntity?> GetCurrentUserAsync()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-                     ?? User.FindFirstValue("sub");
-
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
         return Guid.TryParse(userId, out var id)
             ? await userManager.FindByIdAsync(id.ToString())
             : null;
     }
+
+    private async Task SendEmailAsync(string email, string subject, string html)
+    {
+        try
+        {
+            await emailService.SendEmailAsync(email, subject, html);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Email Error] Failed to send '{subject}': {ex.Message}");
+        }
+    }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private static void DevLog(string label, UserEntity user, string code) =>
+        Console.WriteLine($"[DEV] {label} for {user.Email} (UserId {user.Id}): {code}");
 
     private void SetAuthCookies(AuthTokensDto auth)
     {
@@ -375,16 +315,11 @@ public class CourierAuthController(
     {
         Response.Cookies.Delete(AccessCookie, new CookieOptions
         {
-            Path = "/",
-            Secure = Request.IsHttps,
-            SameSite = SameSiteMode.Lax
+            Path = "/", Secure = Request.IsHttps, SameSite = SameSiteMode.Lax
         });
-
         Response.Cookies.Delete(RefreshCookie, new CookieOptions
         {
-            Path = RefreshCookiePath,
-            Secure = Request.IsHttps,
-            SameSite = SameSiteMode.Lax
+            Path = RefreshCookiePath, Secure = Request.IsHttps, SameSite = SameSiteMode.Lax
         });
     }
 }
