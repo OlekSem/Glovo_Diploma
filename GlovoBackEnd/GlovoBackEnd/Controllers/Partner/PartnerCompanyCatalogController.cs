@@ -8,19 +8,20 @@ using GlovoBackEnd.Models.Dtos.Company;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using GlovoBackEnd.Services.Interfaces;
 
 namespace GlovoBackEnd.Controllers.Partner;
 
 [ApiController]
 [Authorize(Roles = PartnerRoleNames.CompanyOwner)]
 [Route("api/partner/companies/{companyId:guid}/catalog")]
-public class PartnerCompanyCatalogController(AppDbContext dbContext) : ControllerBase
+public class PartnerCompanyCatalogController(AppDbContext dbContext, IPartnerCompanyAccessService accessService) : ControllerBase
 {
     [HttpGet("categories")]
     public async Task<ActionResult<IReadOnlyCollection<ProductCategoryResponseDto>>> GetCategories(Guid companyId)
     {
         if (!TryGetPartnerId(out var partnerId)) return Unauthorized(new { message = "Invalid partner session." });
-        if (!await IsOwnedActiveCompany(companyId, partnerId)) return NotFound(new { message = "Company not found or is not active." });
+        if (!await accessService.HasActiveCompanyAccessAsync(companyId, partnerId)) return NotFound(new { message = "Company not found or is not active." });
         return Ok(await dbContext.CompanyProductCategories.Where(x => x.CompanyId == companyId && !x.IsDeleted)
             .OrderBy(x => x.SortOrder).ThenBy(x => x.Name).Select(x => ToResponse(x)).ToListAsync());
     }
@@ -29,7 +30,7 @@ public class PartnerCompanyCatalogController(AppDbContext dbContext) : Controlle
     public async Task<ActionResult<ProductCategoryResponseDto>> CreateCategory(Guid companyId, [FromBody] CreateProductCategoryDto dto)
     {
         if (!TryGetPartnerId(out var partnerId)) return Unauthorized(new { message = "Invalid partner session." });
-        if (!await IsOwnedActiveCompany(companyId, partnerId)) return NotFound(new { message = "Company not found or is not active." });
+        if (!await accessService.HasActiveCompanyAccessAsync(companyId, partnerId)) return NotFound(new { message = "Company not found or is not active." });
         var normalizedName = Normalize(dto.Name);
         if (await dbContext.CompanyProductCategories.AnyAsync(x => x.CompanyId == companyId && x.NormalizedName == normalizedName))
             return BadRequest(new { message = "A category with this name already exists." });
@@ -60,7 +61,7 @@ public class PartnerCompanyCatalogController(AppDbContext dbContext) : Controlle
     public async Task<IActionResult> ReorderCategories(Guid companyId, [FromBody] ReorderProductCategoriesDto dto)
     {
         if (!TryGetPartnerId(out var partnerId)) return Unauthorized(new { message = "Invalid partner session." });
-        if (!await IsOwnedActiveCompany(companyId, partnerId)) return NotFound(new { message = "Company not found or is not active." });
+        if (!await accessService.HasActiveCompanyAccessAsync(companyId, partnerId)) return NotFound(new { message = "Company not found or is not active." });
         var ids = dto.CategoryIds.ToList();
         if (ids.Distinct().Count() != ids.Count) return BadRequest(new { message = "Category IDs must be unique." });
         var categories = await dbContext.CompanyProductCategories.Where(x => x.CompanyId == companyId && !x.IsDeleted).ToListAsync();
@@ -169,7 +170,6 @@ public class PartnerCompanyCatalogController(AppDbContext dbContext) : Controlle
     }
 
     private bool TryGetPartnerId(out Guid partnerId) => Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub), out partnerId);
-    private Task<bool> IsOwnedActiveCompany(Guid companyId, Guid partnerId) => dbContext.Companies.AnyAsync(x => x.Id == companyId && x.OwnerId == partnerId && x.Status == CompanyStatus.Approved && !x.IsDeleted);
     private Task<CompanyProductCategoryEntity?> FindCategory(Guid companyId, Guid categoryId, Guid partnerId) => dbContext.CompanyProductCategories.Include(x => x.Company).SingleOrDefaultAsync(x => x.Id == categoryId && x.CompanyId == companyId && !x.IsDeleted && !x.Company.IsDeleted && x.Company.OwnerId == partnerId && x.Company.Status == CompanyStatus.Approved);
     private Task<CompanyProductEntity?> FindProduct(Guid companyId, Guid productId, Guid partnerId) => dbContext.CompanyProducts.Include(x => x.Company).SingleOrDefaultAsync(x => x.Id == productId && x.CompanyId == companyId && !x.IsDeleted && !x.Company.IsDeleted && x.Company.OwnerId == partnerId && x.Company.Status == CompanyStatus.Approved);
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();

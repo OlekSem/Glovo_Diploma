@@ -8,13 +8,14 @@ using GlovoBackEnd.Models.Dtos.Company;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using GlovoBackEnd.Services.Interfaces;
 
 namespace GlovoBackEnd.Controllers.Partner;
 
 [ApiController]
 [Authorize(Roles = PartnerRoleNames.CompanyOwner)]
 [Route("api/partner/companies")]
-public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
+public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyAccessService accessService) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<CompanyResponseDto>> Create([FromBody] CreateCompanyDto dto)
@@ -110,7 +111,7 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
         if (!TryGetPartnerId(out var partnerId))
             return Unauthorized(new { message = "Invalid partner session." });
 
-        if (!await IsApprovedOwnedCompany(companyId, partnerId))
+        if (!await accessService.HasActiveCompanyAccessAsync(companyId, partnerId))
             return NotFound(new { message = "Company not found or is not active." });
 
         var branches = await dbContext.CompanyBranches
@@ -128,7 +129,7 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
         if (!TryGetPartnerId(out var partnerId))
             return Unauthorized(new { message = "Invalid partner session." });
 
-        if (!await IsApprovedOwnedCompany(companyId, partnerId))
+        if (!await accessService.HasActiveCompanyAccessAsync(companyId, partnerId))
             return NotFound(new { message = "Company not found or is not active." });
 
         var branch = new CompanyBranchEntity
@@ -181,9 +182,6 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
     private static string NormalizeName(string name) => name.Trim().ToUpperInvariant();
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private Task<bool> IsApprovedOwnedCompany(Guid companyId, Guid partnerId) =>
-        dbContext.Companies.AnyAsync(x => !x.IsDeleted && x.Id == companyId && x.OwnerId == partnerId && x.Status == CompanyStatus.Approved);
 
     private static CompanyResponseDto ToResponse(CompanyEntity company) =>
         new(company.Id, company.Name, company.Description, company.OwnerId, company.DateCreated, company.Status, company.ModerationComment, company.ReviewedAt, company.Category, company.Subcategory, company.IconUrl, company.BannerUrl);
