@@ -1,4 +1,5 @@
 using GlovoBackEnd.Domain.Entities.Partner;
+using GlovoBackEnd.Models.Address;
 using GlovoBackEnd.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,6 @@ public class ClientCompaniesController(IClientService clientService) : Controlle
 {
     
     [HttpGet]
-    public async Task<IActionResult> GetAllCompanies(string address) => Ok(await clientService.GetAll(address));
+    public async Task<IActionResult> GetAllCompanies([FromQuery]ClientAddressDto clientAddressDto) => Ok(await clientService.GetAll(clientAddressDto));
     
 }

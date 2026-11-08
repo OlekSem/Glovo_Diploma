@@ -62,3 +62,15 @@ public sealed record ProductAddonGroupResponseDto(
     IReadOnlyCollection<ProductAddonItemResponseDto> Items,
     DateTime DateCreated
 );
+public sealed record ClientProductResponseDto(
+    Guid Id,
+    Guid CompanyId,
+    Guid CategoryId,
+    string Name,
+    string Description,
+    decimal Price,
+    string? ImageUrl,
+    int? Calories,
+    decimal? WeightOrVolume,
+    string? WeightType
+    );
