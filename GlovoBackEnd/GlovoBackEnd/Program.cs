@@ -154,6 +154,7 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordHasher<PartnerEntity>, PasswordHasher<PartnerEntity>>();
 // Email Service
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IPartnerCompanyAccessService, PartnerCompanyAccessService>();
 //Client Service
 builder.Services.AddScoped<IClientService, ClientService>();
 
