@@ -16,6 +16,9 @@ import CreateCompanyPage from "./pages/CreateCompanyPage.tsx";
 import CompanyRequestsPage from "./pages/CompanyRequestsPage.tsx";
 import ActiveCompaniesPage from "./pages/ActiveCompaniesPage.tsx";
 import CompanyManagementPage from "./pages/CompanyManagementPage.tsx";
+import CompanyCatalogPage from "./pages/CompanyCatalogPage.tsx";
+import CategoryProductsPage from "./pages/CategoryProductsPage.tsx";
+import {BranchCategoryProductsPage, BranchMenuPage} from "./pages/BranchMenuPages.tsx";
 
 function App() {
 
@@ -36,6 +39,10 @@ function App() {
           <Route path="/companies/new" element={<CreateCompanyPage />} />
           <Route path="/companies" element={<ActiveCompaniesPage />} />
           <Route path="/companies/:companyId" element={<CompanyManagementPage />} />
+          <Route path="/companies/:companyId/catalog" element={<CompanyCatalogPage />} />
+          <Route path="/companies/:companyId/categories/:categoryId/products" element={<CategoryProductsPage />} />
+          <Route path="/companies/:companyId/branches/:branchId" element={<BranchMenuPage />} />
+          <Route path="/companies/:companyId/branches/:branchId/categories/:categoryId/products" element={<BranchCategoryProductsPage />} />
           <Route path="/company-requests" element={<CompanyRequestsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -22,6 +22,68 @@ namespace GlovoBackEnd.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.BranchProductCategoryEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("BranchId", "CategoryId")
+                        .IsUnique();
+
+                    b.ToTable("BranchProductCategories", (string)null);
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.BranchProductEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("BranchId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("BranchProducts", (string)null);
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -145,6 +207,164 @@ namespace GlovoBackEnd.Migrations
                         .IsUnique();
 
                     b.ToTable("Companies", (string)null);
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyProductCategoryEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("CompanyProductCategories", (string)null);
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyProductEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Calories")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal?>("WeightOrVolume")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<string>("WeightType")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("CompanyId", "CategoryId");
+
+                    b.ToTable("CompanyProducts", (string)null);
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.ProductAddonGroupEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("MaximumSelection")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("MinimumSelection")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductAddonGroups", (string)null);
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.ProductAddonItemEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AddonGroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DateCreated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddonGroupId");
+
+                    b.ToTable("ProductAddonItems", (string)null);
                 });
 
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.RoleEntity", b =>
@@ -501,6 +721,44 @@ namespace GlovoBackEnd.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.BranchProductCategoryEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", "Branch")
+                        .WithMany("ProductCategories")
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyProductCategoryEntity", "Category")
+                        .WithMany("Branches")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.BranchProductEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", "Branch")
+                        .WithMany("Products")
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyProductEntity", "Product")
+                        .WithMany("Branches")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", b =>
                 {
                     b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", "Company")
@@ -521,6 +779,58 @@ namespace GlovoBackEnd.Migrations
                         .IsRequired();
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyProductCategoryEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", "Company")
+                        .WithMany("ProductCategories")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyProductEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyProductCategoryEntity", "Category")
+                        .WithMany("Products")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", "Company")
+                        .WithMany("Products")
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Company");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.ProductAddonGroupEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.CompanyProductEntity", "Product")
+                        .WithMany("AddonGroups")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.ProductAddonItemEntity", b =>
+                {
+                    b.HasOne("GlovoBackEnd.Domain.Entities.Company.ProductAddonGroupEntity", "AddonGroup")
+                        .WithMany("Items")
+                        .HasForeignKey("AddonGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AddonGroup");
                 });
 
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.UserRoleEntity", b =>
@@ -605,9 +915,39 @@ namespace GlovoBackEnd.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyBranchEntity", b =>
+                {
+                    b.Navigation("ProductCategories");
+
+                    b.Navigation("Products");
+                });
+
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyEntity", b =>
                 {
                     b.Navigation("Branches");
+
+                    b.Navigation("ProductCategories");
+
+                    b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyProductCategoryEntity", b =>
+                {
+                    b.Navigation("Branches");
+
+                    b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.CompanyProductEntity", b =>
+                {
+                    b.Navigation("AddonGroups");
+
+                    b.Navigation("Branches");
+                });
+
+            modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.ProductAddonGroupEntity", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Identity.RoleEntity", b =>
