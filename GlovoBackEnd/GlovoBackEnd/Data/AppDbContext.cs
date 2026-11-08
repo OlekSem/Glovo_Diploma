@@ -29,6 +29,12 @@ public class AppDbContext : IdentityDbContext<
     public DbSet<PartnerUserRoleEntity> PartnerUserRoles => Set<PartnerUserRoleEntity>();
     public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
     public DbSet<CompanyBranchEntity> CompanyBranches => Set<CompanyBranchEntity>();
+    public DbSet<CompanyProductCategoryEntity> CompanyProductCategories => Set<CompanyProductCategoryEntity>();
+    public DbSet<CompanyProductEntity> CompanyProducts => Set<CompanyProductEntity>();
+    public DbSet<ProductAddonGroupEntity> ProductAddonGroups => Set<ProductAddonGroupEntity>();
+    public DbSet<ProductAddonItemEntity> ProductAddonItems => Set<ProductAddonItemEntity>();
+    public DbSet<BranchProductCategoryEntity> BranchProductCategories => Set<BranchProductCategoryEntity>();
+    public DbSet<BranchProductEntity> BranchProducts => Set<BranchProductEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -122,6 +128,68 @@ public class AppDbContext : IdentityDbContext<
                 .WithMany(x => x.Branches)
                 .HasForeignKey(x => x.CompanyId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompanyProductCategoryEntity>(category =>
+        {
+            category.ToTable("CompanyProductCategories");
+            category.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            category.Property(x => x.NormalizedName).HasMaxLength(120).IsRequired();
+            category.Property(x => x.SortOrder).HasDefaultValue(0);
+            category.HasIndex(x => new { x.CompanyId, x.NormalizedName }).IsUnique();
+            category.HasOne(x => x.Company).WithMany(x => x.ProductCategories)
+                .HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CompanyProductEntity>(product =>
+        {
+            product.ToTable("CompanyProducts");
+            product.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            product.Property(x => x.Description).HasMaxLength(2_000).IsRequired();
+            product.Property(x => x.Price).HasPrecision(12, 2);
+            product.Property(x => x.ImageUrl).HasMaxLength(2_000);
+            product.Property(x => x.WeightOrVolume).HasPrecision(10, 2);
+            product.Property(x => x.WeightType).HasMaxLength(16);
+            product.HasIndex(x => new { x.CompanyId, x.CategoryId });
+            product.HasOne(x => x.Company).WithMany(x => x.Products)
+                .HasForeignKey(x => x.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            product.HasOne(x => x.Category).WithMany(x => x.Products)
+                .HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductAddonGroupEntity>(group =>
+        {
+            group.ToTable("ProductAddonGroups");
+            group.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            group.HasIndex(x => x.ProductId);
+            group.HasOne(x => x.Product).WithMany(x => x.AddonGroups)
+                .HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ProductAddonItemEntity>(item =>
+        {
+            item.ToTable("ProductAddonItems");
+            item.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            item.Property(x => x.Price).HasPrecision(12, 2);
+            item.HasIndex(x => x.AddonGroupId);
+            item.HasOne(x => x.AddonGroup).WithMany(x => x.Items)
+                .HasForeignKey(x => x.AddonGroupId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BranchProductCategoryEntity>(availability =>
+        {
+            availability.ToTable("BranchProductCategories");
+            availability.HasIndex(x => new { x.BranchId, x.CategoryId }).IsUnique();
+            availability.HasOne(x => x.Branch).WithMany(x => x.ProductCategories).HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Cascade);
+            availability.HasOne(x => x.Category).WithMany(x => x.Branches).HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BranchProductEntity>(availability =>
+        {
+            availability.ToTable("BranchProducts");
+            availability.HasIndex(x => new { x.BranchId, x.ProductId }).IsUnique();
+            availability.HasOne(x => x.Branch).WithMany(x => x.Products).HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Cascade);
+            availability.HasOne(x => x.Product).WithMany(x => x.Branches).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

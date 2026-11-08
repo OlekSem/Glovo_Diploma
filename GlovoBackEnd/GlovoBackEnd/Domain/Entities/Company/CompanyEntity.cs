@@ -25,4 +25,6 @@ public class CompanyEntity : BaseEntity<Guid>
     public Guid OwnerId { get; set; }
     public PartnerEntity Owner { get; set; } = null!;
     public ICollection<CompanyBranchEntity> Branches { get; set; } = new List<CompanyBranchEntity>();
+    public ICollection<CompanyProductCategoryEntity> ProductCategories { get; set; } = new List<CompanyProductCategoryEntity>();
+    public ICollection<CompanyProductEntity> Products { get; set; } = new List<CompanyProductEntity>();
 }

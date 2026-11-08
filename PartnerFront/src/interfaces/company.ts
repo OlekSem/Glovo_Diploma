@@ -45,3 +45,59 @@ export interface CreateCompanyBranchDto {
     address: string;
     postalCode: string;
 }
+
+export interface ProductCategory {
+    id: string;
+    companyId: string;
+    name: string;
+    sortOrder: number;
+    dateCreated: string;
+}
+
+export interface CompanyProduct {
+    id: string;
+    companyId: string;
+    categoryId: string;
+    name: string;
+    description: string;
+    price: number;
+    imageUrl?: string | null;
+    calories?: number | null;
+    weightOrVolume?: number | null;
+    weightType?: "g" | "ml" | null;
+    dateCreated: string;
+}
+
+export interface ProductAddonItem {
+    id: string;
+    name: string;
+    price: number;
+}
+
+export interface ProductAddonGroup {
+    id: string;
+    productId: string;
+    name: string;
+    minimumSelection: number;
+    maximumSelection: number;
+    items: ProductAddonItem[];
+    dateCreated: string;
+}
+
+export interface CreateProductDto {
+    name: string;
+    description: string;
+    price: number;
+    calories?: number | null;
+    weightOrVolume?: number | null;
+    weightType?: "g" | "ml" | null;
+}
+
+export interface CreateProductAddonGroupDto {
+    name: string;
+    minimumSelection: number;
+    maximumSelection: number;
+    items: Array<{name: string; price: number}>;
+}
+export interface BranchMenuCategory { id: string; name: string; isAvailable: boolean; }
+export interface BranchMenuProduct { id: string; name: string; description: string; price: number; imageUrl?: string | null; isAvailable: boolean; }

@@ -13,4 +13,6 @@ public class CompanyBranchEntity : BaseEntity<Guid>
     public string Region { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string PostalCode { get; set; } = string.Empty;
+    public ICollection<BranchProductCategoryEntity> ProductCategories { get; set; } = new List<BranchProductCategoryEntity>();
+    public ICollection<BranchProductEntity> Products { get; set; } = new List<BranchProductEntity>();
 }

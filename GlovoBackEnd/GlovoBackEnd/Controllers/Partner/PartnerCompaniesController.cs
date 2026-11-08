@@ -149,6 +149,28 @@ public class PartnerCompaniesController(AppDbContext dbContext) : ControllerBase
         return CreatedAtAction(nameof(GetBranches), new { companyId }, ToBranchResponse(branch));
     }
 
+    [HttpPut("{companyId:guid}/branches/{branchId:guid}")]
+    public async Task<ActionResult<CompanyBranchResponseDto>> UpdateBranch(Guid companyId, Guid branchId, [FromBody] UpdateCompanyBranchDto dto)
+    {
+        if (!TryGetPartnerId(out var partnerId))
+            return Unauthorized(new { message = "Invalid partner session." });
+
+        var branch = await dbContext.CompanyBranches.Include(x => x.Company).SingleOrDefaultAsync(x =>
+            !x.IsDeleted && x.Id == branchId && x.CompanyId == companyId && !x.Company.IsDeleted &&
+            x.Company.OwnerId == partnerId && x.Company.Status == CompanyStatus.Approved);
+        if (branch is null)
+            return NotFound(new { message = "Branch not found." });
+
+        branch.Phone = dto.Phone.Trim();
+        branch.Email = dto.Email.Trim();
+        branch.Locality = dto.Locality.Trim();
+        branch.Region = dto.Region.Trim();
+        branch.Address = dto.Address.Trim();
+        branch.PostalCode = dto.PostalCode.Trim();
+        await dbContext.SaveChangesAsync();
+        return Ok(ToBranchResponse(branch));
+    }
+
     private bool TryGetPartnerId(out Guid partnerId)
     {
         var value = User.FindFirstValue(ClaimTypes.NameIdentifier)

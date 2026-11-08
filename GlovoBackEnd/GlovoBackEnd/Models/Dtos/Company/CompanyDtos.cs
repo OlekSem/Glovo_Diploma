@@ -51,6 +51,15 @@ public sealed record CompanyBranchResponseDto(
     DateTime DateCreated
 );
 
+public sealed record UpdateCompanyBranchDto(
+    [Required, StringLength(32, MinimumLength = 7)] string Phone,
+    [Required, EmailAddress, StringLength(254)] string Email,
+    [Required, StringLength(120, MinimumLength = 2)] string Locality,
+    [Required, StringLength(120, MinimumLength = 2)] string Region,
+    [Required, StringLength(250, MinimumLength = 5)] string Address,
+    [Required, StringLength(12, MinimumLength = 3)] string PostalCode
+);
+
 public sealed record AdminCompanyResponseDto(
     Guid Id,
     string Name,
