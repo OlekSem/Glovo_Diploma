@@ -72,5 +72,6 @@ public sealed record ClientProductResponseDto(
     string? ImageUrl,
     int? Calories,
     decimal? WeightOrVolume,
-    string? WeightType
+    string? WeightType,
+    List<Guid> AvailableBranchIds
     );

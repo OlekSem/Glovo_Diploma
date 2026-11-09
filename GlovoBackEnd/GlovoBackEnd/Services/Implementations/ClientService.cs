@@ -16,24 +16,28 @@ public class ClientService(AppDbContext dbContext) : IClientService
             .Include(c => c.Branches)
             .Where(x => 
                 x.Branches.Any(y =>
-                y.Address == clientAddressDto.Address && y.Region == clientAddressDto.Region ))
+                y.Region == clientAddressDto.Region
+                && y.Locality == clientAddressDto.Locality))
             .Select(x =>
                 CompanyMapper.ToClientCompanyResponseDto(x,
                 x.Branches.Where(y =>
-                    y.Region == clientAddressDto.Region && y.Address == clientAddressDto.Address)))
+                    y.Region == clientAddressDto.Region && y.Locality == clientAddressDto.Locality)))
             .ToListAsync();
         return companies;
         
     }
 
-    public async Task<IReadOnlyList<ClientProductResponseDto>> GetById(Guid branchId)
+    public async Task<IReadOnlyList<ClientProductResponseDto>>
+        GetProductsByBranchesId(List<Guid> branchIds)
     {
-        var products = await dbContext.BranchProducts
+        var branchProducts = await dbContext.BranchProducts
+            .Where(x => branchIds.Contains(x.BranchId) && x.IsAvailable)
             .Include(x => x.Product)
-            .Where(x => x.BranchId == branchId)
-            .Select(x=>CompanyMapper.ToClientProductResponseDto(x.Product))
             .ToListAsync();
-            
-        return products;
+
+        return branchProducts
+            .GroupBy(x => x.ProductId)
+            .Select(g => g.ToClientProductResponseDto())
+            .ToList();
     }
 }

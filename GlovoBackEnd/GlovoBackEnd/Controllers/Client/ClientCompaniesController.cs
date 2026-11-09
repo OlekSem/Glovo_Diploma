@@ -12,6 +12,10 @@ public class ClientCompaniesController(IClientService clientService) : Controlle
 {
     
     [HttpGet]
-    public async Task<IActionResult> GetAllCompanies([FromQuery]ClientAddressDto clientAddressDto) => Ok(await clientService.GetAll(clientAddressDto));
+    public async Task<IActionResult> GetAllCompanies([FromQuery]ClientAddressDto clientAddressDto)
+        => Ok(await clientService.GetAll(clientAddressDto));
+    [HttpGet("menu")]
+    public async Task<IActionResult> GetAll([FromQuery] List<Guid> branchIds)
+        =>  Ok(await clientService.GetProductsByBranchesId(branchIds));
     
 }

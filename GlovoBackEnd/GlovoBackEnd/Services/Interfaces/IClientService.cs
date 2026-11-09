@@ -6,5 +6,5 @@ namespace GlovoBackEnd.Services.Interfaces;
 public interface IClientService
 {
     Task<IReadOnlyList<ClientCompanyResponseDto>> GetAll(ClientAddressDto clientAddressDto);
-    Task<IReadOnlyList<ClientProductResponseDto>> GetById(Guid companyId);
+    Task<IReadOnlyList<ClientProductResponseDto>> GetProductsByBranchesId(List<Guid> branchIds);
 }

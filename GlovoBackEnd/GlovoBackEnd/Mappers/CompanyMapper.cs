@@ -19,9 +19,24 @@ public static class CompanyMapper
             companyBranch.Phone, companyBranch.Email,
             companyBranch.Locality, companyBranch.Region,
             companyBranch.Address);
-    public static ClientProductResponseDto ToClientProductResponseDto(this CompanyProductEntity product) =>
-        new(product.Id, product.CompanyId, product.CategoryId,product.Name,
-            product.Description, product.Price, product.ImageUrl,
-            product.Calories, product.WeightOrVolume,  product.WeightType);
+    public static ClientProductResponseDto ToClientProductResponseDto(
+        this IGrouping<Guid, BranchProductEntity> group)
+    {
+        var product = group.First().Product;
+
+        return new ClientProductResponseDto(
+            product.Id,
+            product.CompanyId,
+            product.CategoryId,
+            product.Name,
+            product.Description,
+            product.Price,
+            product.ImageUrl,
+            product.Calories,
+            product.WeightOrVolume,
+            product.WeightType,
+            group.Select(x => x.BranchId).ToList()
+        );
+    }
 
 }
