@@ -85,7 +85,8 @@ public sealed record ClientCompanyResponseDto(
     string? Subcategory,
     string? IconUrl,
     string? BannerUrl,
-    int BranchesCount
+    int BranchesCount,
+    IEnumerable<ClientCompanyBranchResponseDto> Branches
 );
 public sealed record ClientCompanyBranchResponseDto(
     Guid Id,
