@@ -4,6 +4,7 @@ using GlovoBackEnd.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -20,6 +21,7 @@ namespace GlovoBackEnd.Migrations
                 .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "postgis");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("GlovoBackEnd.Domain.Entities.Company.BranchProductCategoryEntity", b =>
@@ -114,6 +116,9 @@ namespace GlovoBackEnd.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<Point>("Location")
+                        .HasColumnType("geography(Point,4326)");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -132,6 +137,10 @@ namespace GlovoBackEnd.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("Location");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Location"), "gist");
 
                     b.ToTable("CompanyBranches", (string)null);
                 });
