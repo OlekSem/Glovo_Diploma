@@ -14,20 +14,26 @@ public class ClientService(AppDbContext dbContext) : IClientService
     {
         var companies = await dbContext.Companies
             .Include(c => c.Branches)
-            .Where(x => x.Branches.Any(y =>
+            .Where(x => 
+                x.Branches.Any(y =>
                 y.Address == clientAddressDto.Address && y.Region == clientAddressDto.Region ))
-            .Select(x => CompanyMapper.ToClientCompanyResponseDto(x))
+            .Select(x =>
+                CompanyMapper.ToClientCompanyResponseDto(x,
+                x.Branches.Where(y =>
+                    y.Region == clientAddressDto.Region && y.Address == clientAddressDto.Address)))
             .ToListAsync();
         return companies;
         
     }
 
-    public async Task<IReadOnlyList<ClientProductResponseDto>> GetById(Guid companyId)
+    public async Task<IReadOnlyList<ClientProductResponseDto>> GetById(Guid branchId)
     {
-        var products = await dbContext.CompanyProducts
-            .Where(x => x.CompanyId == companyId)
-            .Select(x => CompanyMapper.ToClientProductResponseDto(x))
+        var products = await dbContext.BranchProducts
+            .Include(x => x.Product)
+            .Where(x => x.BranchId == branchId)
+            .Select(x=>CompanyMapper.ToClientProductResponseDto(x.Product))
             .ToListAsync();
+            
         return products;
     }
 }

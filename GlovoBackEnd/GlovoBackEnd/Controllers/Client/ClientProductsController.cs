@@ -9,6 +9,6 @@ namespace GlovoBackEnd.Controllers.Client;
 public class ClientProductsController(IClientService clientService) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetAsync([FromQuery] Guid companyId) =>  Ok(await clientService.GetById(companyId));
+    public async Task<IActionResult> GetAll([FromQuery] Guid branchId) =>  Ok(await clientService.GetById(branchId));
     
 }
