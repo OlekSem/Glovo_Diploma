@@ -22,3 +22,8 @@ public sealed record ClientResponseDto(
 );
 
 public sealed record AuthClientResponseDto(ClientResponseDto Client);
+public class ConfirmClientEmailDto
+{
+    public string Email { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+}
