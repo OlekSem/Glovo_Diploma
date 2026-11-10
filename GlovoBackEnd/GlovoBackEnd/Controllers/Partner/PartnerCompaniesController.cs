@@ -9,13 +9,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GlovoBackEnd.Services.Interfaces;
+using NetTopologySuite.Geometries;
 
 namespace GlovoBackEnd.Controllers.Partner;
 
 [ApiController]
 [Authorize(Roles = PartnerRoleNames.CompanyOwner)]
 [Route("api/partner/companies")]
-public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyAccessService accessService) : ControllerBase
+public class PartnerCompaniesController(
+    AppDbContext dbContext,
+    IPartnerCompanyAccessService accessService,
+    IGeocodingService geocodingService) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<CompanyResponseDto>> Create([FromBody] CreateCompanyDto dto)
@@ -117,10 +121,8 @@ public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyA
         var branches = await dbContext.CompanyBranches
             .Where(x => !x.IsDeleted && x.CompanyId == companyId)
             .OrderByDescending(x => x.DateCreated)
-            .Select(x => new CompanyBranchResponseDto(
-                x.Id, x.CompanyId, x.Phone, x.Email, x.Locality, x.Region, x.Address, x.PostalCode, x.DateCreated))
             .ToListAsync();
-        return Ok(branches);
+        return Ok(branches.Select(ToBranchResponse).ToList());
     }
 
     [HttpPost("{companyId:guid}/branches")]
@@ -132,6 +134,10 @@ public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyA
         if (!await accessService.HasActiveCompanyAccessAsync(companyId, partnerId))
             return NotFound(new { message = "Company not found or is not active." });
 
+        var locationResult = await ResolveLocationAsync(dto.Location, BuildAddress(dto));
+        if (locationResult.Result is not null)
+            return locationResult.Result;
+
         var branch = new CompanyBranchEntity
         {
             Id = Guid.NewGuid(),
@@ -142,6 +148,7 @@ public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyA
             Region = dto.Region.Trim(),
             Address = dto.Address.Trim(),
             PostalCode = dto.PostalCode.Trim(),
+            Location = locationResult.Location,
             DateCreated = DateTime.UtcNow
         };
         dbContext.CompanyBranches.Add(branch);
@@ -162,12 +169,17 @@ public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyA
         if (branch is null)
             return NotFound(new { message = "Branch not found." });
 
+        var locationResult = await ResolveLocationAsync(dto.Location, BuildAddress(dto));
+        if (locationResult.Result is not null)
+            return locationResult.Result;
+
         branch.Phone = dto.Phone.Trim();
         branch.Email = dto.Email.Trim();
         branch.Locality = dto.Locality.Trim();
         branch.Region = dto.Region.Trim();
         branch.Address = dto.Address.Trim();
         branch.PostalCode = dto.PostalCode.Trim();
+        branch.Location = locationResult.Location;
         await dbContext.SaveChangesAsync();
         return Ok(ToBranchResponse(branch));
     }
@@ -187,5 +199,52 @@ public class PartnerCompaniesController(AppDbContext dbContext, IPartnerCompanyA
         new(company.Id, company.Name, company.Description, company.OwnerId, company.DateCreated, company.Status, company.ModerationComment, company.ReviewedAt, company.Category, company.Subcategory, company.IconUrl, company.BannerUrl);
 
     private static CompanyBranchResponseDto ToBranchResponse(CompanyBranchEntity branch) =>
-        new(branch.Id, branch.CompanyId, branch.Phone, branch.Email, branch.Locality, branch.Region, branch.Address, branch.PostalCode, branch.DateCreated);
+        new(
+            branch.Id,
+            branch.CompanyId,
+            branch.Phone,
+            branch.Email,
+            branch.Locality,
+            branch.Region,
+            branch.Address,
+            branch.PostalCode,
+            branch.Location is null ? null : new BranchLocationDto(branch.Location.Y, branch.Location.X),
+            branch.DateCreated);
+
+    private static Point? ToPoint(BranchLocationDto? location) =>
+        location is null
+            ? null
+            : new Point(location.Longitude, location.Latitude) { SRID = 4326 };
+
+    private async Task<(Point? Location, ActionResult? Result)> ResolveLocationAsync(
+        BranchLocationDto? suppliedLocation,
+        string address)
+    {
+        if (suppliedLocation is not null)
+            return (ToPoint(suppliedLocation), null);
+
+        try
+        {
+            var location = await geocodingService.GeocodeAsync(address, HttpContext.RequestAborted);
+            return location is null
+                ? (null, BadRequest(new { message = "Не вдалося знайти координати за цією адресою. Уточніть адресу філії." }))
+                : (location, null);
+        }
+        catch (HttpRequestException)
+        {
+            return (null, StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { message = "Сервіс визначення локації тимчасово недоступний. Спробуйте пізніше." }));
+        }
+        catch (TaskCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            return (null, StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { message = "Сервіс визначення локації не відповідає. Спробуйте пізніше." }));
+        }
+    }
+
+    private static string BuildAddress(CreateCompanyBranchDto dto) =>
+        $"{dto.Address.Trim()}, {dto.Locality.Trim()}, {dto.Region.Trim()}, {dto.PostalCode.Trim()}, Україна";
+
+    private static string BuildAddress(UpdateCompanyBranchDto dto) =>
+        $"{dto.Address.Trim()}, {dto.Locality.Trim()}, {dto.Region.Trim()}, {dto.PostalCode.Trim()}, Україна";
 }

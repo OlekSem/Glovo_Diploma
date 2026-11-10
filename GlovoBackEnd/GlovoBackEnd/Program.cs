@@ -17,7 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection")));
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsqlOptions => npgsqlOptions.UseNetTopologySuite()));
 
 
 builder.Services.AddControllers().AddJsonOptions(options =>
@@ -157,6 +158,17 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IPartnerCompanyAccessService, PartnerCompanyAccessService>();
 //Client Service
 builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddHttpClient<IGeocodingService, NominatimGeocodingService>(client =>
+{
+    client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+    var contactEmail = builder.Configuration["Geocoding:ContactEmail"]
+        ?? builder.Configuration["Admin:Email"];
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        builder.Configuration["Geocoding:UserAgent"]
+        ?? $"GlovoDiploma/1.0 (contact: {contactEmail ?? "not-configured"})");
+    client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("uk");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 
 
