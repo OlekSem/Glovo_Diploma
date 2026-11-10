@@ -15,13 +15,13 @@ export default function TabsLayout() {
 
         if (!refreshToken) {
           // Якщо токена немає — користувач НЕ залогінений. Викидаємо на авторизацію.
-          router.replace("/(auth)/index");
+          router.replace("/(auth)");
         } else {
           setIsLoading(false);
         }
       } catch (error) {
         console.error("Помилка перевірки авторизації в табах:", error);
-        router.replace("/(auth)/index");
+        router.replace("/(auth)");
       }
     }
 

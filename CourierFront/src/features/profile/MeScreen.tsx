@@ -2,6 +2,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { useGetMeQuery, useLogoutMutation } from "@/store/service/apiAccount";
 import { getSecureStore } from "@/utils/secureStore";
+import { useRouter } from "expo-router";
 
 export const LogoutButton = () => {
   const [triggerLogout, { isLoading }] = useLogoutMutation();
@@ -33,6 +34,7 @@ export const LogoutButton = () => {
 
 export default function MeScreen() {
   const { data: user, isLoading, isError, error, refetch } = useGetMeQuery();
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -64,7 +66,12 @@ export default function MeScreen() {
         </Text>
         <Text className="text-gray-400 mt-1">{user?.email}</Text>
       </View>
-
+      <TouchableOpacity
+        className={'w-full bg-amber-300 rounded p-3'}
+        onPress={() => {router.push('/(auth)/change-password')}}
+      >
+        <Text className={"text-center text-xl"}>Change password</Text>
+      </TouchableOpacity>
       <LogoutButton />
     </SafeAreaView>
   );
