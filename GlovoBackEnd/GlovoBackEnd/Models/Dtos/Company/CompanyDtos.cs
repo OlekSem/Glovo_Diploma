@@ -36,7 +36,14 @@ public sealed record CreateCompanyBranchDto(
     [Required, StringLength(120, MinimumLength = 2)] string Locality,
     [Required, StringLength(120, MinimumLength = 2)] string Region,
     [Required, StringLength(250, MinimumLength = 5)] string Address,
-    [Required, StringLength(12, MinimumLength = 3)] string PostalCode
+    [Required, StringLength(12, MinimumLength = 3)] string PostalCode,
+    BranchLocationDto? Location
+);
+
+/// <summary>WGS 84 coordinates used to create a PostGIS geography point.</summary>
+public sealed record BranchLocationDto(
+    [Range(-90, 90)] double Latitude,
+    [Range(-180, 180)] double Longitude
 );
 
 public sealed record CompanyBranchResponseDto(
@@ -48,6 +55,7 @@ public sealed record CompanyBranchResponseDto(
     string Region,
     string Address,
     string PostalCode,
+    BranchLocationDto? Location,
     DateTime DateCreated
 );
 
@@ -57,7 +65,8 @@ public sealed record UpdateCompanyBranchDto(
     [Required, StringLength(120, MinimumLength = 2)] string Locality,
     [Required, StringLength(120, MinimumLength = 2)] string Region,
     [Required, StringLength(250, MinimumLength = 5)] string Address,
-    [Required, StringLength(12, MinimumLength = 3)] string PostalCode
+    [Required, StringLength(12, MinimumLength = 3)] string PostalCode,
+    BranchLocationDto? Location
 );
 
 public sealed record AdminCompanyResponseDto(

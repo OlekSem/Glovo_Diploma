@@ -39,6 +39,7 @@ public class AppDbContext : IdentityDbContext<
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasPostgresExtension("postgis");
 
         // Configure custom UserRole relationship if needed
         modelBuilder.Entity<UserRoleEntity>(userRole =>
@@ -123,7 +124,9 @@ public class AppDbContext : IdentityDbContext<
             branch.Property(x => x.Region).HasMaxLength(120).IsRequired();
             branch.Property(x => x.Address).HasMaxLength(250).IsRequired();
             branch.Property(x => x.PostalCode).HasMaxLength(12).IsRequired();
+            branch.Property(x => x.Location).HasColumnType("geography(Point,4326)");
             branch.HasIndex(x => x.CompanyId);
+            branch.HasIndex(x => x.Location).HasMethod("gist");
             branch.HasOne(x => x.Company)
                 .WithMany(x => x.Branches)
                 .HasForeignKey(x => x.CompanyId)
