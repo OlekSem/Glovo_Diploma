@@ -5,7 +5,7 @@ import {NavigationContainer} from "@react-navigation/native";
 import {createNativeStackNavigator} from "@react-navigation/native-stack";
 
 import WelcomeScreen from "./src/features/auth/screens/WelcomeScreen";
-import LoginScreen from "./src/features/auth/screens/LoginScreen";
+import LoginScreen from "./src/features/auth/screens//login/LoginScreen";
 import EmailScreen from "@/features/auth/screens/singup/EmailScreen";
 
 import "./global.css";
