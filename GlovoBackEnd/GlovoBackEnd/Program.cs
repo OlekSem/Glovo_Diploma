@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using Amazon.Runtime;
+using Amazon.S3;
+using Core.Services;
 using GlovoBackEnd.Data;
 using GlovoBackEnd.Domain.Entities.Identity;
 using GlovoBackEnd.Domain.Entities.Partner;
@@ -11,6 +14,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -145,7 +149,47 @@ builder.Services.AddAuthentication(options =>
         
     });
 
+try
+{
+    var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+    if (string.IsNullOrWhiteSpace(redisConnectionString))
+        throw new InvalidOperationException("Redis connection string is not set in configuration.");
 
+    var redisMultiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
+    builder.Services.AddSingleton<IConnectionMultiplexer>(redisMultiplexer);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Failed to connect to Redis - {ex.Message}");
+    throw;
+}
+
+try
+{
+    var minioConfig = builder.Configuration.GetSection("MinIO");
+    var accessKey = minioConfig["AccessKey"];
+    var secretKey = minioConfig["SecretKey"];
+    var endpoint = minioConfig["Endpoint"];
+
+    if (string.IsNullOrWhiteSpace(accessKey) || string.IsNullOrWhiteSpace(secretKey) || string.IsNullOrWhiteSpace(endpoint))
+        throw new InvalidOperationException("MinIO configuration section is incomplete (AccessKey/SecretKey/Endpoint).");
+
+    var s3Client = new AmazonS3Client(
+        new BasicAWSCredentials(accessKey, secretKey),
+        new AmazonS3Config
+        {
+            ServiceURL = endpoint,
+            ForcePathStyle = true
+        }
+    );
+
+    builder.Services.AddSingleton<IAmazonS3>(s3Client);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Failed to configure MinIO/S3 client - {ex.Message}");
+    throw;
+}
 
 
 
@@ -158,6 +202,8 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IPartnerCompanyAccessService, PartnerCompanyAccessService>();
 //Client Service
 builder.Services.AddScoped<IClientService, ClientService>();
+builder.Services.AddScoped<IMinioImageService, MinioImageService>();
+builder.Services.AddScoped<IRedisService, RedisService>();
 builder.Services.AddHttpClient<IGeocodingService, NominatimGeocodingService>(client =>
 {
     client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
