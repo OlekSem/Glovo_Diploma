@@ -93,6 +93,8 @@ export interface CreateProductDto {
     weightType?: "g" | "ml" | null;
 }
 
+export interface UpdateProductDto extends CreateProductDto {}
+
 export interface CreateProductAddonGroupDto {
     name: string;
     minimumSelection: number;

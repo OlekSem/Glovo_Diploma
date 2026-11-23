@@ -19,7 +19,8 @@ namespace GlovoBackEnd.Controllers.Partner;
 public class PartnerCompaniesController(
     AppDbContext dbContext,
     IPartnerCompanyAccessService accessService,
-    IGeocodingService geocodingService) : ControllerBase
+    IGeocodingService geocodingService,
+    IMinioImageService imageService) : ControllerBase
 {
     [HttpPost]
     public async Task<ActionResult<CompanyResponseDto>> Create([FromBody] CreateCompanyDto dto)
@@ -108,6 +109,16 @@ public class PartnerCompaniesController(
 
         return Ok(ToResponse(company));
     }
+
+    [HttpPut("{companyId:guid}/images/icon")]
+    [RequestSizeLimit(8 * 1024 * 1024)]
+    public Task<ActionResult<CompanyResponseDto>> UploadIcon(Guid companyId, [FromForm] IFormFile? file) =>
+        UploadCompanyImage(companyId, file, ImageUploadKind.CompanyIcon);
+
+    [HttpPut("{companyId:guid}/images/banner")]
+    [RequestSizeLimit(8 * 1024 * 1024)]
+    public Task<ActionResult<CompanyResponseDto>> UploadBanner(Guid companyId, [FromForm] IFormFile? file) =>
+        UploadCompanyImage(companyId, file, ImageUploadKind.CompanyBanner);
 
     [HttpGet("{companyId:guid}/branches")]
     public async Task<ActionResult<IReadOnlyCollection<CompanyBranchResponseDto>>> GetBranches(Guid companyId)
@@ -215,6 +226,43 @@ public class PartnerCompaniesController(
         location is null
             ? null
             : new Point(location.Longitude, location.Latitude) { SRID = 4326 };
+
+    private async Task<ActionResult<CompanyResponseDto>> UploadCompanyImage(
+        Guid companyId,
+        IFormFile? file,
+        ImageUploadKind kind)
+    {
+        if (!TryGetPartnerId(out var partnerId))
+            return Unauthorized(new { message = "Invalid partner session." });
+
+        var company = await dbContext.Companies.SingleOrDefaultAsync(x =>
+            !x.IsDeleted && x.Id == companyId && x.OwnerId == partnerId && x.Status == CompanyStatus.Approved);
+        if (company is null)
+            return NotFound(new { message = "Company not found or is not active." });
+
+        string newPath;
+        try
+        {
+            newPath = await imageService.UploadImageAsync(file!, kind, HttpContext.RequestAborted);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+
+        var oldPath = kind == ImageUploadKind.CompanyIcon ? company.IconUrl : company.BannerUrl;
+        if (kind == ImageUploadKind.CompanyIcon) company.IconUrl = newPath;
+        else company.BannerUrl = newPath;
+        await dbContext.SaveChangesAsync();
+
+        if (!string.IsNullOrWhiteSpace(oldPath))
+        {
+            try { await imageService.DeleteImageAsync(oldPath, HttpContext.RequestAborted); }
+            catch (Exception) { /* The replacement is persisted; the old object can be cleaned up later. */ }
+        }
+
+        return Ok(ToResponse(company));
+    }
 
     private async Task<(Point? Location, ActionResult? Result)> ResolveLocationAsync(
         BranchLocationDto? suppliedLocation,
