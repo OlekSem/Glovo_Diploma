@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import APP_ENV from "../../env";
-import type {BranchMenuCategory, BranchMenuProduct, Company, CompanyBranch, CompanyProduct, CreateCompanyBranchDto, CreateCompanyDto, CreateProductAddonGroupDto, CreateProductDto, ProductAddonGroup, ProductCategory, UpdateCompanyDto} from "../interfaces/company";
+import type {BranchMenuCategory, BranchMenuProduct, Company, CompanyBranch, CompanyProduct, CreateCompanyBranchDto, CreateCompanyDto, CreateProductAddonGroupDto, CreateProductDto, ProductAddonGroup, ProductCategory, UpdateCompanyDto, UpdateProductDto} from "../interfaces/company";
 
 export const companyApi = createApi({
     reducerPath: "companyApi",
@@ -24,6 +24,14 @@ export const companyApi = createApi({
         }),
         updateCompany: builder.mutation<Company, {companyId: string; company: UpdateCompanyDto}>({
             query: ({companyId, company}) => ({url: `/${companyId}`, method: "PUT", body: company}),
+            invalidatesTags: ["Companies"],
+        }),
+        uploadCompanyImage: builder.mutation<Company, {companyId: string; kind: "icon" | "banner"; file: File}>({
+            query: ({companyId, kind, file}) => {
+                const body = new FormData();
+                body.append("file", file);
+                return {url: `/${companyId}/images/${kind}`, method: "PUT", body};
+            },
             invalidatesTags: ["Companies"],
         }),
         getCompanyBranches: builder.query<CompanyBranch[], string>({
@@ -66,6 +74,18 @@ export const companyApi = createApi({
             query: ({companyId, categoryId, product}) => ({url: `/${companyId}/catalog/categories/${categoryId}/products`, method: "POST", body: product}),
             invalidatesTags: (_result, _error, {categoryId}) => [{type: "Products", id: categoryId}],
         }),
+        updateProduct: builder.mutation<CompanyProduct, {companyId: string; categoryId: string; productId: string; product: UpdateProductDto}>({
+            query: ({companyId, productId, product}) => ({url: `/${companyId}/catalog/products/${productId}`, method: "PUT", body: product}),
+            invalidatesTags: (_result, _error, {categoryId}) => [{type: "Products", id: categoryId}],
+        }),
+        uploadProductImage: builder.mutation<CompanyProduct, {companyId: string; categoryId: string; productId: string; file: File}>({
+            query: ({companyId, productId, file}) => {
+                const body = new FormData();
+                body.append("file", file);
+                return {url: `/${companyId}/catalog/products/${productId}/image`, method: "PUT", body};
+            },
+            invalidatesTags: (_result, _error, {categoryId}) => [{type: "Products", id: categoryId}],
+        }),
         deleteProduct: builder.mutation<void, {companyId: string; categoryId: string; productId: string}>({
             query: ({companyId, productId}) => ({url: `/${companyId}/catalog/products/${productId}`, method: "DELETE"}),
             invalidatesTags: (_result, _error, {categoryId}) => [{type: "Products", id: categoryId}],
@@ -96,6 +116,7 @@ export const companyApi = createApi({
 export const {
     useCreateCompanyMutation,
     useUpdateCompanyMutation,
+    useUploadCompanyImageMutation,
     useGetMyCompaniesQuery,
     useGetMyCompanyRequestsQuery,
     useGetCompanyBranchesQuery,
@@ -108,6 +129,8 @@ export const {
     useReorderProductCategoriesMutation,
     useGetProductsQuery,
     useCreateProductMutation,
+    useUpdateProductMutation,
+    useUploadProductImageMutation,
     useDeleteProductMutation,
     useGetProductAddonsQuery,
     useCreateProductAddonGroupMutation,

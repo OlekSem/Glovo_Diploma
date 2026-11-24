@@ -15,7 +15,10 @@ namespace GlovoBackEnd.Controllers.Partner;
 [ApiController]
 [Authorize(Roles = PartnerRoleNames.CompanyOwner)]
 [Route("api/partner/companies/{companyId:guid}/catalog")]
-public class PartnerCompanyCatalogController(AppDbContext dbContext, IPartnerCompanyAccessService accessService) : ControllerBase
+public class PartnerCompanyCatalogController(
+    AppDbContext dbContext,
+    IPartnerCompanyAccessService accessService,
+    IMinioImageService imageService) : ControllerBase
 {
     [HttpGet("categories")]
     public async Task<ActionResult<IReadOnlyCollection<ProductCategoryResponseDto>>> GetCategories(Guid companyId)
@@ -108,14 +111,73 @@ public class PartnerCompanyCatalogController(AppDbContext dbContext, IPartnerCom
         return CreatedAtAction(nameof(GetProducts), new { companyId, categoryId }, ToResponse(product));
     }
 
+    [HttpPut("products/{productId:guid}")]
+    public async Task<ActionResult<ProductResponseDto>> UpdateProduct(Guid companyId, Guid productId, [FromBody] UpdateProductDto dto)
+    {
+        if (!TryGetPartnerId(out var partnerId)) return Unauthorized(new { message = "Invalid partner session." });
+        var product = await FindProduct(companyId, productId, partnerId);
+        if (product is null) return NotFound(new { message = "Product not found." });
+
+        var weightType = NormalizeWeightType(dto.WeightType);
+        if (!string.IsNullOrWhiteSpace(dto.WeightType) && weightType is null)
+            return BadRequest(new { message = "Weight type must be g or ml." });
+        if ((weightType is null && dto.WeightOrVolume is not null) || (weightType is not null && dto.WeightOrVolume is null))
+            return BadRequest(new { message = "Specify both weight/volume and its type, or leave both empty." });
+
+        product.Name = dto.Name.Trim();
+        product.Description = dto.Description.Trim();
+        product.Price = dto.Price;
+        product.Calories = dto.Calories;
+        product.WeightOrVolume = dto.WeightOrVolume;
+        product.WeightType = weightType;
+        await dbContext.SaveChangesAsync();
+        return Ok(ToResponse(product));
+    }
+
+    [HttpPut("products/{productId:guid}/image")]
+    [RequestSizeLimit(8 * 1024 * 1024)]
+    public async Task<ActionResult<ProductResponseDto>> UploadProductImage(Guid companyId, Guid productId, [FromForm] IFormFile? file)
+    {
+        if (!TryGetPartnerId(out var partnerId)) return Unauthorized(new { message = "Invalid partner session." });
+        var product = await FindProduct(companyId, productId, partnerId);
+        if (product is null) return NotFound(new { message = "Product not found." });
+
+        string newPath;
+        try
+        {
+            newPath = await imageService.UploadImageAsync(file!, ImageUploadKind.Product, HttpContext.RequestAborted);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+
+        var oldPath = product.ImageUrl;
+        product.ImageUrl = newPath;
+        await dbContext.SaveChangesAsync();
+        if (!string.IsNullOrWhiteSpace(oldPath))
+        {
+            try { await imageService.DeleteImageAsync(oldPath, HttpContext.RequestAborted); }
+            catch (Exception) { /* The new product image remains available even if cleanup fails. */ }
+        }
+
+        return Ok(ToResponse(product));
+    }
+
     [HttpDelete("products/{productId:guid}")]
     public async Task<IActionResult> DeleteProduct(Guid companyId, Guid productId)
     {
         if (!TryGetPartnerId(out var partnerId)) return Unauthorized(new { message = "Invalid partner session." });
         var product = await FindProduct(companyId, productId, partnerId);
         if (product is null) return NotFound(new { message = "Product not found." });
+        var imagePath = product.ImageUrl;
         dbContext.CompanyProducts.Remove(product);
         await dbContext.SaveChangesAsync();
+        if (!string.IsNullOrWhiteSpace(imagePath))
+        {
+            try { await imageService.DeleteImageAsync(imagePath, HttpContext.RequestAborted); }
+            catch (Exception) { /* Database deletion must not be rolled back by storage cleanup. */ }
+        }
         return NoContent();
     }
 

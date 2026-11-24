@@ -25,6 +25,15 @@ public sealed record CreateProductDto(
     [StringLength(16)] string? WeightType
 );
 
+public sealed record UpdateProductDto(
+    [Required, StringLength(160, MinimumLength = 2)] string Name,
+    [Required, StringLength(2_000, MinimumLength = 2)] string Description,
+    [Range(0, 9_999_999_999.99)] decimal Price,
+    [Range(0, 100_000)] int? Calories,
+    [Range(0.01, 99_999_999.99)] decimal? WeightOrVolume,
+    [StringLength(16)] string? WeightType
+);
+
 public sealed record ProductResponseDto(
     Guid Id,
     Guid CompanyId,
